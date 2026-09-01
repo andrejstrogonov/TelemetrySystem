@@ -23,42 +23,50 @@ ECC и CRC здесь — не «надстройки», а **встроенны
 
 ## Переформулировка элементов в терминах динамических систем
 
-### 1. Объект и входные воздействия (генератор сигналов и датчики)
+### 1. Объект и входные воздействия (генератор сигналов и датчики) Plant
 
 - **Терминология моделирования**: многомерный объект с распределёнными параметрами под совместным действием детерминированных и стохастических возмущений.
 - **Математическая модель**: непрерывная или дискретная модель динамики (например, RC‑цепочка для температурного дрейфа, синусоида + шум для сигнала).
 - **Роль в системе**: источник траекторий состояний $x(t)$ и наблюдаемых $y(t)$.
 - **С учётом ECC**: пока не участвует напрямую; но шумы и дрейфы определяют частоту срабатывания порогов и, следовательно, нагрузку на ECC‑память (сколько раз пишем/читаем, сколько ошибок потенциально возникает).
+- Вход: input_signal
+- Выход: output_signal
 
 ---
 
-### 2. Первая ПЛИС (цифровая фильтрация)
+### 2. Первая ПЛИС (цифровая фильтрация) ADC_Filter
 
 - **Терминология**: подсистема первичной обработки в дискретном времени (DSP‑звено).
 - **Модель**: дискретная передаточная функция $H(z)$ (КИХ/БИХ) или фильтр Калмана в пространстве состояний.
 - **Динамика**: подавление высокочастотных компонент $w[k]$, выделение полезного сигнала.
 - **Показатели качества**: АЧХ/ФЧХ, групповая задержка (транспортная задержка $\tau$), устойчивость (Z‑плоскость).
 - **Связь с ECC**: чистый сигнал снижает вероятность ложных срабатываний и уменьшает объём «аварийных» записей в память, тем самым снижая нагрузку на ECC.
+- Вход: signal_In
+- Выход: signal_out
 
 ---
 
-### 3. Вторая ПЛИС (CRC32)
+### 3. Вторая ПЛИС (CRC32) CRC_Chain
 
 - **Терминология**: контур контроля инвариантов информационного потока.
 - **Модель**: полиномиальное деление в поле GF(2); остаток — флаг целостности.
 - **Роль**: бинарный индикатор «целое/повреждено» для каждого пакета.
 - **Влияние на устойчивость**: минимизация $\tau_{CRC}$ (времени вычисления) критично для реального времени.
 - **Связь с ECC**: CRC указывает, что данные повреждены; ECC пытается восстановить состояние. Это два уровня защиты: CRC — детекция, ECC — коррекция.
+- Вход: dataIn
+- Выходы: dataOut, startOut, validEndOut
 
 ---
 
-### 4. ECC‑коррекция ошибок памяти (добавленная фича)
+### 4. ECC‑коррекция ошибок памяти (добавленная фича) ECC_Chain
 
 - **Терминология**: внутренний контур восстановления целостности состояния при сбоях среды хранения.
 - **Математическая абстракция**:
   - Кодирование: $c = G \cdot d$, где $d$ — информационные биты, $c$ — кодовое слово с избыточностью, $G$ — порождающая матрица.
   - Декодирование: проверка $Hc = 0$ (матрица проверки $H$), исправление 1 бита, детектирование 2 битов (SECDED).
 - **Динамическая интерпретация**: ECC — это **динамическое звено с памятью**, которое при чтении восстанавливает «истинное» состояние $x[k]$ из искажённого
+- Вход: data
+- Выходы: data_out, ecc_corrected, ecc_uncorreectable
 
 
 $x'[k]$. В терминах теории управления это можно трактовать как **наблюдатель с коррекцией ошибок среды**.
@@ -67,7 +75,7 @@ $x'[k]$. В терминах теории управления это можно
 
 ---
 
-### 5. Dual‑Path Log Storage и детектор аномалий (>30%)
+### 5. Dual‑Path Log Storage и детектор аномалий (>30%) Logging_DualPath
 
 - **Терминология**: нелинейный пороговый элемент + событийная архитектура (Event‑Triggered).
 - **Модель детектора**: $\Vert \Delta e[k] \Vert > 0.3 \cdot X_{\text{эталон}} \Rightarrow$ активация аварийного режима.
@@ -75,14 +83,20 @@ $x'[k]$. В терминах теории управления это можно
 - **С учётом ECC**: буфер хранит кодовые слова; при чтении ECC исправляет возможные ошибки памяти. Таким образом, «снимок» аварии — это восстановленное состояние, а не потенциально искажённое.
 - **Автомат состояний (Stateflow)**: формализует переходы Normal → Alarm → Snapshot, включая логику повторных попыток чтения с ECC и обработку случаев неисправимых ошибок.
 
+- Входы: ecc_data, snapshot_trigger
+- Выходы: pathA_out, pathB_out, snapshot_ready
+
 ---
 
-### 6. STM32, Web‑сервер, Wi‑Fi
+### 6. STM32, Web‑сервер, Wi‑Fi Gateway_STM32
 
 - **Терминология**: координатор верхнего уровня (шлюз) с дискретным каналом связи и переменным транспортным запаздыванием.
 - **Модель**: дискретный канал с задержкой $\tau_{net}$, джиттером, потерями пакетов.
 - **Роль**: агрегация результатов фильтрации, CRC, ECC, детекции аномалий; упаковка в JSON.
 - **Связь с динамикой**: агрегированные данные — это «наблюдаемые» $y[k]$, по которым можно судить о состоянии системы.
+
+- Входы: crc_error, ecc_flags, anomaly, snapshot_trigger, data
+- Выход: output_bytes
 
 ---
 
@@ -128,3 +142,155 @@ $x'[k]$. В терминах теории управления это можно
 - **Gateway** — STM32‑эквивалент: Rate Transition, упаковка, выход.
 
 Таким образом, ECC становится **неотъемлемой частью контура достоверности состояния**, а не отдельной «надстройкой». Это придаёт проекту системную строгость и делает его убедительным с точки зрения теории управления и надёжности.
+
+## Принципиальная схема соединений (UML-подобная)
+componentDiagram
+    title UML Component Diagram: отказоустойчивая система сбора телеметрии (CRC32 + ECC)
+
+    component "Power" as Power {
+        port "Vin" as Power_Vin
+        port "Vout_5.5V" as Power_Vout
+        port "fault_flags" as Power_Fault
+    }
+
+    component "Plant (объект + возмущения)" as Plant {
+        port "(in) input_signal" as Plant_In
+        port "(out) output_signal / y[k]" as Plant_Out
+        port "(out) w[k], v[k] (возмущения)" as Plant_Noise
+    }
+
+    component "ADC" as ADC {
+        port "(in) signal_In" as ADC_In
+        port "(out) signal_Out" as ADC_Out
+    }
+
+    component "ADC_Filter (DSP)" as Filter {
+        port "(in) signal_In" as Filter_In
+        port "(out) signal_out" as Filter_Out
+    }
+
+    component "CRC_Chain (CRC32)" as CRC {
+        port "(in) dataIn" as CRC_In
+        port "(in) startIn" as CRC_StartIn
+        port "(out) dataOut" as CRC_Out
+        port "(out) startOut" as CRC_StartOut
+        port "(out) validEndOut" as CRC_Valid
+        port "(out) errFlag" as CRC_Err
+    }
+
+    component "ChannelErr (инъекция ошибок канала)" as ChannelErr {
+        port "(in) dataIn" as Channel_In
+        port "(in) inject_err" as Channel_ErrIn
+        port "(out) dataOut" as Channel_Out
+    }
+
+    component "ECC_Chain (Encoder)" as ECC_Enc {
+        port "(in) data" as ECC_Enc_In
+        port "(in) write_en" as ECC_Enc_Write
+        port "(in) inject_bit_err" as ECC_Enc_ErrIn
+        port "(out) encoded_data" as ECC_Enc_Out
+    }
+
+    component "RAM_Ring (кольцевой буфер)" as RAM {
+        port "(in) data_in" as RAM_In
+        port "(out) data_out" as RAM_Out
+    }
+
+    component "ECC_Chain (Decoder)" as ECC_Dec {
+        port "(in) data" as ECC_Dec_In
+        port "(in) read_addr" as ECC_Dec_Addr
+        port "(out) data_out" as ECC_Dec_Out
+        port "(out) ecc_corrected" as ECC_Dec_Corr
+        port "(out) ecc_uncorrectable" as ECC_Dec_Uncorr
+    }
+
+    component "AnomalyDet (порог >30%)" as Anomaly {
+        port "(in) filtered_signal" as Anom_InSig
+        port "(in) ref_level" as Anom_Ref
+        port "(in) delta_thresh" as Anom_Thresh
+        port "(out) anomaly_flag" as Anom_Flag
+        port "(out) delta_e" as Anom_Delta
+    }
+
+    component "Stateflow (автомат состояний)" as Stateflow {
+        port "(in) anomaly_flag" as SF_Anom
+        port "(in) ecc_flags" as SF_ECC
+        port "(in) crc_err" as SF_CRC
+        port "(in) snapshot_req" as SF_SnapReq
+        port "(out) state_id" as SF_State
+        port "(out) log_enable" as SF_LogEn
+        port "(out) path_select" as SF_PathSel
+        port "(out) retry_req" as SF_Retry
+        port "(out) snapshot_ready" as SF_SnapReady
+    }
+
+    component "DualPath Log Storage" as DualPath {
+        port "(in) ecc_data" as DP_Data
+        port "(in) log_enable" as DP_LogEn
+        port "(in) path_select" as DP_PathSel
+        port "(in) timestamp" as DP_TS
+        port "(out) pathA_out" as DP_A
+        port "(out) pathB_out" as DP_B
+        port "(out) snapshot_data" as DP_Snap
+        port "(out) buffer_full" as DP_Full
+    }
+
+    component "Gateway_STM32" as STM {
+        port "(in) crc_error" as STM_CRC
+        port "(in) ecc_flags" as STM_ECC
+        port "(in) anomaly" as STM_Anom
+        port "(in) snapshot_trigger" as STM_SnapTrig
+        port "(in) data" as STM_Data
+        port "(in) state_id" as STM_State
+        port "(out) output_bytes (JSON)" as STM_Out
+    }
+
+    component "Net (канал передачи)" as Net {
+        port "(in) tx_data" as Net_In
+        port "(out) telemetry" as Net_Out
+    }
+
+    component "InjectBitErr (тест ECC)" as InjectBit {
+        port "(out) inject_bit_err" as Inject_Out
+    }
+
+
+    %% Соединения: выход → вход с размерностями/смыслом
+    Power_Vout --> Plant_In : питание объекта
+    Power_Fault --> STM_ECC : флаги ошибок питания → телеметрия
+
+    Plant_Out --> ADC_In : y[k] → квантование
+    Plant_Noise --> ChannelErr_ErrIn : w[k],v[k] → ошибки канала
+    Plant_Noise --> Inject_Out : w[k],v[k] → тестовые битовые ошибки
+
+    ADC_Out --> Filter_In : квантованный сигнал
+    Filter_Out --> CRC_In : поток для CRC
+    Filter_Out --> ECC_Enc_In : данные для ECC кодирования
+    Filter_Out --> Anom_InSig : сигнал для детекции аномалий
+
+    CRC_In --> CRCGen : данные на CRC
+    CRC_StartIn --> const_start : старт пакета (константа/автомат)
+    CRC_Out --> Channel_In : передача через канал с ошибками
+    Channel_Out --> CRCDet : искажённые данные на детектор
+    CRCDet --> STM_CRC : errFlag → телеметрия
+    CRCDet --> SF_CRC : validEndOut → автомат состояний
+
+    ECC_Enc_Out --> RAM_In : запись в буфер в кодовом виде
+    RAM_Out --> ECC_Dec_In : чтение для декодирования
+    ECC_Dec_Out --> DualPath_Data : восстановленные данные
+    ECC_Dec_Corr --> STM_ECC : флаг коррекции → телеметрия
+    ECC_Dec_Uncorr --> SF_ECC : неисправимая ошибка → автомат
+
+    Anom_Flag --> SF_Anom : событие аномалии
+    SF_LogEn --> DualPath_LogEn : разрешение записи
+    SF_PathSel --> DualPath_PathSel : выбор пути A/B
+    SF_SnapReady --> STM_SnapTrig : триггер снимка
+
+    DualPath_Snap --> STM_Data : «снимок» аварии → телеметрия
+    DualPath_A --> (scope/file) : поток A (опц.)
+    DualPath_B --> (scope/file) : поток B (опц.)
+
+    STM_Out --> Net_In : JSON‑телеметрия → сеть
+    Net_Out --> Output : итоговые данные
+
+    Inject_Out --> ECC_Enc_ErrIn : тестовые ошибки памяти
