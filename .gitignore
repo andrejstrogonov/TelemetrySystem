@@ -1,39 +1,46 @@
-# Autosave files
+# MATLAB and Simulink temporary files
 *.asv
 *.m~
 *.autosave
 *.slx.r*
 *.mdl.r*
+*.bak
+*.tmp
 
-# Derived content-obscured files
+# MATLAB protected and compiled files
 *.p
-
-# Compiled MEX files
 *.mex*
 
-# Packaged app and toolbox files
+# MATLAB package and deployment artifacts
 *.mlappinstall
 *.mltbx
-
-# Deployable archives
 *.ctf
+*.mlproj
+*.mldatx
 
-# Generated helpsearch folders
+# Generated documentation and caches
 helpsearch*/
+.buildtool/
+*.log
 
-# Code generation folders
+# Simulink and code generation output
 slprj/
 sccprj/
 codegen/
+*_ert_rtw/
+*_grt_rtw/
+*_rtw/
+hdlsrc/
 
-# Cache files
+# Simulink cache files
 *.slxc
+*.slxp
+
+# Generated test and measurement output
+input_signals/owon_output/
 
 # Cloud based storage dotfile
 .MATLABDriveTag
-
-# buildtool cache folder
-.buildtool/
 
 # SimBiology backup files
 *.sbproj.backup
