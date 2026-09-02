@@ -1,0 +1,6 @@
+:FUNCtion StairUp
+:FUNCtion:FREQuency 100
+:FUNCtion:AMPLitude 3.3
+:FUNCtion:OFFSet 1.65
+:FUNCtion:LOAD OFF
+:CHANnel ON

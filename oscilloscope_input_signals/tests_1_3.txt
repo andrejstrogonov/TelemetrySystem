@@ -1,0 +1,6 @@
+:FUNCtion SQUare
+:FUNCtion:FREQuency 16000      % 32 кбит/с / 2 = 16 кГц
+:FUNCtion:AMPLitude 3.3        % Vpp (High Z)
+:FUNCtion:OFFSet 1.65          % середина
+:FUNCtion:LOAD OFF             % High Z
+:CHANnel ON

@@ -1,0 +1,7 @@
+:FUNCtion PULSe
+:FUNCtion:FREQuency 1000       % 1 кГц (частота кадра)
+:FUNCtion:AMPLitude 3.3
+:FUNCtion:OFFSet 1.65
+:FUNCtion:PULSe:DTYCycle 25.0  % 25% — имитация помехи
+:FUNCtion:LOAD OFF
+:CHANnel ON
