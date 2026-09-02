@@ -1,4 +1,4 @@
-function [data_out, ecc_corrected, ecc_uncorrectable] = fcn(r)
+function [data_out, ecc_corrected, ecc_uncorrectable] = turbo_decoder(r)
     % r: принятое из памяти 39-битное слово
     
     % Инициализация флагов
@@ -43,7 +43,8 @@ function [data_out, ecc_corrected, ecc_uncorrectable] = fcn(r)
     end
     
     % Извлекаем чистые 32 бита данных из исправленного слова
-    data_pos =;
+    data_pos = [3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 21, ...
+        22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 33, 34, 35, 36, 37, 38];
     data_out = zeros(1, 32);
     for i = 1:32
         data_out(i) = r(data_pos(i));

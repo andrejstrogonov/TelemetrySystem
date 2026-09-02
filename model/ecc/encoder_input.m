@@ -1,4 +1,4 @@
-function code_word = fcn(data_in)
+function code_word = encoder_input(data_in)
     % data_in: вектор из 32 элементов (uint8 или логический), содержащий биты данных
     % code_word: выходной вектор из 39 бит
     
@@ -9,7 +9,8 @@ function code_word = fcn(data_in)
     % Позиции контрольных бит: 1, 2, 4, 8, 16, 32
     % Позиция 39 — общий бит четности (для превращения SEC в SECDED)
     
-    data_pos =;
+    data_pos = [3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 21, ...
+        22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 33, 34, 35, 36, 37, 38];
     
     for i = 1:32
         c(data_pos(i)) = data_in(i);
