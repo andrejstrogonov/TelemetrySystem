@@ -1,0 +1,7 @@
+:FUNCtion SQUare
+:FUNCtion:FREQuency 16000
+:FUNCtion:AMPLitude 3.3
+:FUNCtion:OFFSet 1.65
+:FUNCtion:LOAD OFF
+:CHANnel ON
+% Test: 1. Идеальный (эталон) (bitrate 32000 bit/s)

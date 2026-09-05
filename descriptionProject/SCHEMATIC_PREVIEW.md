@@ -1,6 +1,11 @@
 ## Принципиальная схема соединений (UML-подобная)
+
+> Системные границы, внешние I/O, внутренние шины, открытые решения и план верификации: [SYSTEM_ENGINEERING_SPECIFICATION.md](SYSTEM_ENGINEERING_SPECIFICATION.md).
+>
+> Параметрическое техническое задание на FDM-корпус: [ENCLOSURE_SPECIFICATION.md](ENCLOSURE_SPECIFICATION.md).
+
 componentDiagram
-    title UML Component Diagram: отказоустойчивая система сбора телеметрии (CRC32 + ECC)
+    title UML Component Diagram: Rev A (CRC-32/MPEG-2 + Hamming SEC-DED)
 
     component "Power" as Power {
         port "Vin" as Power_Vin
@@ -14,7 +19,7 @@ componentDiagram
         port "(out) w[k], v[k] (возмущения)" as Plant_Noise
     }
 
-    component "ADC" as ADC {
+    component "MCP3201-CI/P (12-bit, 100 kSPS)" as ADC {
         port "(in) signal_In" as ADC_In
         port "(out) signal_Out" as ADC_Out
     }
@@ -24,7 +29,7 @@ componentDiagram
         port "(out) signal_out" as Filter_Out
     }
 
-    component "CRC_Chain (CRC32)" as CRC {
+    component "CRC_Chain (CRC-32/MPEG-2)" as CRC {
         port "(in) dataIn" as CRC_In
         port "(in) startIn" as CRC_StartIn
         port "(out) dataOut" as CRC_Out
@@ -90,7 +95,7 @@ componentDiagram
         port "(out) buffer_full" as DP_Full
     }
 
-    component "Gateway_STM32" as STM {
+    component "Gateway STM32G0B1CBT6" as STM {
         port "(in) crc_error" as STM_CRC
         port "(in) ecc_flags" as STM_ECC
         port "(in) anomaly" as STM_Anom
@@ -98,6 +103,11 @@ componentDiagram
         port "(in) data" as STM_Data
         port "(in) state_id" as STM_State
         port "(out) output_bytes (JSON)" as STM_Out
+    }
+
+    component "PC server + Electron" as Electron {
+        port "HTTP /status JSON" as Electron_In
+        port "RS-485 bridge commands" as Electron_Out
     }
 
     component "Net (канал передачи)" as Net {
@@ -147,25 +157,28 @@ componentDiagram
 
     STM_Out --> Net_In : JSON‑телеметрия → сеть
     Net_Out --> Output : итоговые данные
+    STM_Out --> Net_In : RS-485 поток телеметрии
+    Net_Out --> Electron_In : server -> HTTP /status -> Electron
 
     Inject_Out --> ECC_Enc_ErrIn : тестовые ошибки памяти
 
 
 ## 1. Распределение компонентов по чипам (Топология)
 
-* **FPGA 1 (Gowin GW1N/GW2A): Тракт первичной обработки и контроля целостности**
+* **FPGA 1 (Gowin GW1NR-9C): Тракт первичной обработки и контроля целостности**
   * `ADC_Filter (DSP)`
-  * `CRC_Chain (CRC32)`
+    * `CRC_Chain (CRC-32/MPEG-2)`
   * `ChannelErr`
   * `AnomalyDet`
-* **FPGA 2 (Gowin GW1N/GW2A): Тракт помехоустойчивого кодирования и хранения**
-  * `ECC_Chain (Encoder/Decoder)`
+* **FPGA 2 (Gowin GW1NR-9C): Тракт помехоустойчивого кодирования и хранения**
+    * `ECC_Chain (55-bit SEC-DED: 48+6+1)`
   * `RAM_Ring`
   * `DualPath Log Storage`
   * `InjectBitErr`
-* **MCU (STM32F4/F7/H7): Координация, логика и интерфейсы**
+* **MCU (STM32G0B1CBT6, LQFP-48): Координация, логика и интерфейсы**
   * `Stateflow (автомат состояний)`
   * `Gateway_STM32`
+    * `RS-485 -> USB adapter -> PC server -> HTTP /status -> Electron`
 
 ---
 
@@ -175,11 +188,10 @@ componentDiagram
 
 | Название шины | Номинал | Потребители | Назначение |
 | :--- | :--- | :--- | :--- |
-| **VCC_5V** | 5.0 В | ADC (Analog section), `Plant` (Датчики) | Первичное аналоговое питание |
+| **VCC_5V5** | 5.5 В | входной аналоговый тракт, DC/DC | Стабилизированная силовая шина |
 | **VCC_3.3V** | 3.3 В | STM32 (V_DD), Gowin (V_CCIO), ADC (Digital) | Питание цифровых буферов ввода-вывода (I/O) |
 | **VCC_1.2V** | 1.2 В | Gowin 1 & Gowin 2 (V_CC) | Питание ядер обеих ПЛИС (Core Power) |
-| **VCC_1.8V** | 1.8 В | Gowin 1 & Gowin 2 (V_CCX) | Вспомогательное питание ПЛИС (Auxiliary) |
-| **V_REF** | 2.5/3.0 В | ADC (V_REF) | Прецизионный источник опорного напряжения |
+| **V_REF** | 3.3 В | MCP3201 (V_REF) | Опорное напряжение ADC |
 
 ---
 
@@ -189,7 +201,7 @@ componentDiagram
 
 ### 📊 Шина АЦП (Параллельная/SPI)
 * **Соединение:** `ADC` -> `FPGA 1 (Filter_In)`
-* **Состав:** `ADC_CLK` (такты), `ADC_DATA[11:0]` (12-битный параллельный код выборки), `ADC_DRDY` (готовность данных).
+* **Состав:** `ADC_SCK`, `ADC_DOUT`, `ADC_CONV`, `ADC_CS_N`; последовательный SPI, 12-битный код.
 
 ### 🎛️ Внутренняя шина ЦОС (Внутри FPGA 1)
 * **Соединение:** `Filter_Out` -> `CRC_In` / `ECC_Enc_In` / `Anom_InSig`
@@ -201,24 +213,21 @@ componentDiagram
 
 ### 🔀 Межплиточная шина данных (FPGA 1 -> FPGA 2)
 * **Соединение:** Передача потока данных и контрольных сумм из `FPGA 1` в `FPGA 2`.
-* **Тип:** **LVDS SPI / High-Speed Parallel**
+* **Тип:** синхронный CMOS 3.3 В, 8-битный поток
 * **Состав:** `FPGA_CLK`, `FPGA_DATA[7:0]`, `FPGA_FRAME` (кадрирование), `CRC_ERR_FLAG` (аварийный маркер прямого действия).
 
 ### 🧠 Локальная шина памяти и ECC (Внутри FPGA 2)
 * **Соединение:** `ECC_Enc` -> `RAM_Ring` -> `ECC_Dec`
 * **Тип:** **System Memory Bus**
 * **Состав:**
-  * `DATA_BUS[15:0]`: Информационные биты.
-  * `ECC_BUS[5:0]`: Избыточные биты Хемминга (SEC-DED для 16-битного слова).
+    * `DATA_BUS[47:0]`: 16-битный payload + 32-битный CRC.
+    * `ECC_BUS[6:0]`: 6 бит Хемминга + 1 общий parity; полное кодовое слово — 55 бит.
   * `WR_EN` / `RD_EN`: Сигналы записи и чтения кольцевого буфера.
 
-### 🏛️ Системная шина управления и снимков (FPGA 2 <-> STM32)
+### 🏛️ Системная шина управления и снимков (FPGA 2 <-> STM32G0B1)
 * **Соединение:** Передача логов `DualPath` и флагов в `STM32`, возврат команд управления (`path_select`, `log_enable`).
-* **Тип:** **FMC/FSMC (Flexible Static Memory Controller)** или высокоскоростной **SPI + DMA**
-* **Состав:**
-  * `STM_A[9:0]`: Шина адреса для чтения регистров аварийных снимков (Snapshot).
-  * `STM_D[15:0]`: Шина данных (чтение восстановленных данных `DualPath_Snap`).
-  * `CTRL_LINES`: `CS_N` (выбор чипа), `OE_N` (разрешение выхода), `WE_N` (разрешение записи).
+* **Тип:** **SPI + DMA, 3.3 В** (выбран для дешёвой Rev A; FMC/FSMC не используется)
+* **Состав:** `SPI_SCK`, `SPI_MOSI`, `SPI_MISO`, `SPI_CS_N`, `IRQ_*`, `RESET_N`; данные снимка читаются пакетами через DMA.
 
 ### 🚨 Шина событий и прерываний (FPGA 1/2 -> STM32)
 * **Соединение:** Аварийные флаги на GPIO‑входы STM32 с функцией EXTI (внешние прерывания) для `Stateflow`.
@@ -230,8 +239,14 @@ componentDiagram
 
 ### 🌐 Выходная шина телеметрии
 * **Соединение:** `Gateway_STM32 (STM_Out)` -> `Net_In`
-* **Тип:** **UART-to-Ethernet (или Wi-Fi/Can-Bus трансивер)**
-* **Состав:** `TX`, `RX`, `RTS`, `CTS` (аппаратный контроль потока для исключения потери JSON-пакетов).
+* **Тип:** **UART 3.3 В** в Rev A; для кабеля вне корпуса добавить RS-485-трансивер. Ethernet/Wi-Fi/CAN оставить опциями следующих ревизий.
+* **Состав:** UART STM32 -> RS-485: `TX`, `RX`, `DE/RE`, `A`, `B`, `GND`; `RTS/CTS` не используются.
+
+### 🧰 Индивидуальные порты прошивки и PC-мониторинга
+* `J4 SERVICE_USB`: USB STM32 для сервиса; не является обязательным каналом Electron.
+* `J5 MCU_PROG`: отдельный SWD STM32 (`3V3`, `SWDIO`, `SWCLK`, `NRST`, `SWO`, `GND`).
+* `J6 FPGA1_PROG`: отдельный JTAG FPGA1 (`3V3`, `TCK`, `TMS`, `TDI`, `TDO`, `TRST_N`, `PROGRAM_N`, `GND`).
+* `J7 FPGA2_PROG`: отдельный JTAG FPGA2 с тем же набором сигналов; J6 и J7 не объединять.
 
 ---
 

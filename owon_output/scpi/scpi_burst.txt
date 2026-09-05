@@ -1,0 +1,8 @@
+:FUNCtion PULSe
+:FUNCtion:FREQuency 1000
+:FUNCtion:AMPLitude 3.3
+:FUNCtion:OFFSet 1.65
+:FUNCtion:PULSe:DTYCycle 25.0
+:FUNCtion:LOAD OFF
+:CHANnel ON
+% Test: 4. Пакетная ошибка (burst 8) (burst 8 bits)
