@@ -30,16 +30,16 @@ fprintf('\n=== ГЕНЕРАЦИЯ ТЕСТОВЫХ СИГНАЛОВ ===\n\n');
 rng(config.test.payload_seed);
 payload = randi([0 1], 1, config.frame.payload_bits);
 
-[crc_bits, ~] = crc8_compute(payload, ...
+[crc_bits, ~] = crc32_compute(payload, ...
     config.crc.polynomial, config.crc.init, config.crc.xor_out);
 
-data_24 = [payload, crc_bits];
+data_48 = [payload, crc_bits];
 
-[frame_ideal, ~] = ecc_hamming_encode(data_24, config);
+[frame_ideal, ~] = ecc_hamming_encode(data_48, config);
 
 fprintf('[1/4] Идеальный кадр:\n');
 fprintf('  Payload:  %s\n', num2str(payload));
-fprintf('  CRC-8:    %s\n', num2str(crc_bits));
+fprintf('  CRC-32:   %s\n', num2str(crc_bits));
 fprintf('  Frame:    %s\n', num2str(frame_ideal));
 
 %% ── 2. Одиночная битовая ошибка ──
@@ -137,7 +137,7 @@ test_signals = struct( ...
     'frame_burst',  frame_burst, ...
     'payload',      payload, ...
     'crc_bits',     crc_bits, ...
-    'data_24',      data_24, ...
+    'data_48',      data_48, ...
     'nrz_dac',      {nrz_dac}, ...
     'nrz_voltage',  {nrz_voltage}, ...
     'time_axis',    {time_axis}, ...
@@ -162,7 +162,7 @@ figure('Name', 'Owon HDS242S — Тестовые сигналы', ...
 for k = 1:4
     % ── Битовый кадр ──
     subplot(4, 2, 2*k-1);
-    stem(1:32, frames{k}, 'filled', 'MarkerSize', 5, ...
+    stem(1:config.frame.total, frames{k}, 'filled', 'MarkerSize', 5, ...
          'Color', colors{k});
     hold on;
     diff_mask = (frames{k} ~= frame_ideal);
@@ -178,7 +178,7 @@ for k = 1:4
     title(labels{k}, 'FontSize', 10, 'Color', colors{k});
     xlabel('Бит'); ylabel('Значение');
     ylim([-0.5 1.5]); yticks([0 1]); grid on;
-    xlim([0 33]);
+    xlim([0 config.frame.total + 1]);
 
     % ── NRZ-сигнал ──
     subplot(4, 2, 2*k);
@@ -218,7 +218,7 @@ fprintf('[PNG] %s\n', config.paths.plot_file);
 fprintf('\n=== СВОДКА ===\n');
 fprintf('  Кадр:     %d бит\n', config.frame.total);
 fprintf('  Payload:  %s\n', num2str(payload));
-fprintf('  CRC-8:    %s\n', num2str(crc_bits));
+    fprintf('  CRC-32:   %s\n', num2str(crc_bits));
 fprintf('  Hamming:  (%d,%d) SEC-DED\n', ...
     config.hamming.code_length, config.hamming.info_length);
 fprintf('\n  Ошибки:\n');

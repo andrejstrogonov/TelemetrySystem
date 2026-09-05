@@ -20,44 +20,42 @@ config.owon.functions = { ...
     'TRIangle', 'SINC', 'BESSEL', 'StairUp'};
 
 %% ── Параметры NRZ-кодирования ──
-config.nrz.frame_length   = 32;          % бит в кадре
-config.nrz.points_per_bit = 256;          % 8192 / 32
+config.nrz.frame_length   = 55;          % 48 data + 6 Hamming + overall parity
+config.nrz.points_per_bit = 128;          % 55*128 = 7040 <= 8192
 config.nrz.level_low      = 0;            % логический 0 → код ЦАП
 config.nrz.level_high     = 16383;        % логический 1 → код ЦАП
 config.nrz.voltage_low    = 0.0;          % вольт
 config.nrz.voltage_high   = 3.3;          % вольт
 config.nrz.voltage_offset = 1.65;         % смещение, В
 config.nrz.bitrate        = 32000;        % бит/с (32 кбит/с)
-config.nrz.frame_rate     = 1000;         % кадров/с (1 кГц)
-config.nrz.sample_rate    = 8192000;      % частота дискретизации AWG, Гц
+config.nrz.frame_rate     = config.nrz.bitrate / config.nrz.frame_length;
+config.nrz.sample_rate    = 4096000;      % 128 samples/bit at 32 kbit/s
 
-%% ── Структура кадра (32 бита) ──
+%% ── Структура кадра Rev A (55 бит) ──
 config.frame.payload_bits  = 16;          % биты  1..16
-config.frame.crc_bits      = 8;           % биты 17..24
-config.frame.data_bits     = 24;          % payload + CRC
-config.frame.hamming_bits  = 5;           % биты 25..29 (p1,p2,p4,p8,p16)
-config.frame.parity_bit    = 1;           % бит  30   (overall parity)
-config.frame.reserved_bits = 2;           % биты 31..32
-config.frame.total         = 32;
+config.frame.crc_bits      = 32;          % биты 17..48, CRC-32/MPEG-2
+config.frame.data_bits     = 48;          % payload + CRC
+config.frame.hamming_bits  = 6;           % parity positions 1,2,4,8,16,32
+config.frame.parity_bit    = 1;           % overall parity
+config.frame.reserved_bits = 0;
+config.frame.total         = 55;          % 54-bit Hamming word + overall parity
 
-%% ── Параметры CRC-8 ──
-config.crc.polynomial      = 0x07;        % ATM HEC / стандартный CRC-8
-config.crc.init            = 0xFF;        % начальное значение
-config.crc.xor_out         = 0x00;        % финальный XOR
+%% ── Параметры CRC-32/MPEG-2 ──
+config.crc.polynomial      = uint32(hex2dec('04C11DB7'));
+config.crc.init            = uint32(hex2dec('FFFFFFFF'));
+config.crc.xor_out         = uint32(0);
 config.crc.reflect_in      = false;
 config.crc.reflect_out     = false;
-config.crc.width           = 8;
+config.crc.width           = 32;
 
 %% ── Параметры Hamming SEC-DED ──
-config.hamming.code_length  = 31;          % длина кода Хэмминга
-config.hamming.info_length  = 26;          % инфо-позиций
-config.hamming.parity_length= 5;           % проверочных позиций
-config.hamming.parity_pos   = [1, 2, 4, 8, 16];
-config.hamming.info_pos     = [3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, ...
-                                17, 18, 19, 20, 21, 22, 23, 24, 25, 26, ...
-                                27, 28, 29, 30, 31];
-config.hamming.used_info    = 24;          % реально используем инфо-битов
-                                        % (позиции 30,31 = 0 — заглушки)
+config.hamming.code_length  = 54;          % длина слова Хэмминга
+config.hamming.info_length  = 48;          % информационных позиций
+config.hamming.parity_length= 6;           % проверочных позиций
+config.hamming.parity_pos   = [1, 2, 4, 8, 16, 32];
+config.hamming.info_pos     = setdiff(1:54, config.hamming.parity_pos);
+config.hamming.used_info    = 48;
+config.hamming.total_length = 55;
 
 %% ── SCPI-шаблоны для HDS242S ──
 config.scpi.templates.clock = { ...
@@ -106,9 +104,9 @@ assignin('base', 'config', config);
 fprintf('[CONFIG] Owon HDS242S конфигурация загружена.\n');
 fprintf('  AWG: %d точек, %d бит, %d точек/бит\n', ...
     config.owon.awg_depth, config.owon.dac_bits, config.nrz.points_per_bit);
-fprintf('  Кадр: %d бит (payload=%d, CRC=%d, Hamming=%d, parity=%d, reserv=%d)\n', ...
+fprintf('  Кадр: %d бит (payload=%d, CRC=%d, Hamming=%d, parity=%d)\n', ...
     config.frame.total, config.frame.payload_bits, config.frame.crc_bits, ...
-    config.frame.hamming_bits, config.frame.parity_bit, config.frame.reserved_bits);
-fprintf('  CRC-8: poly=0x%02X, init=0x%02X\n', config.crc.polynomial, config.crc.init);
+    config.frame.hamming_bits, config.frame.parity_bit);
+fprintf('  CRC-32/MPEG-2: poly=0x%08X, init=0x%08X\n', config.crc.polynomial, config.crc.init);
 fprintf('  Hamming: (%d,%d) SEC-DED\n', ...
     config.hamming.code_length, config.hamming.info_length);

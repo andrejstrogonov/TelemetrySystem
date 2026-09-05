@@ -1,31 +1,15 @@
 function code_word = encoder_input(data_in)
-    % data_in: вектор из 32 элементов (uint8 или логический), содержащий биты данных
-    % code_word: выходной вектор из 39 бит
-    
-    % Инициализируем кодовое слово нулями
-    c = zeros(1, 39);
-    
-    % Размещаем 32 бита информационных данных на позиции, не являющиеся степенями двойки
-    % Позиции контрольных бит: 1, 2, 4, 8, 16, 32
-    % Позиция 39 — общий бит четности (для превращения SEC в SECDED)
-    
-    data_pos = [3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 21, ...
-        22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 33, 34, 35, 36, 37, 38];
-    
-    for i = 1:32
-        c(data_pos(i)) = data_in(i);
+% ENCODER_INPUT  Rev A extended Hamming encoder: 48 data -> 55 bits.
+    assert(numel(data_in) == 48, 'Expected 48 data bits');
+    parity_pos = [1, 2, 4, 8, 16, 32];
+    data_pos = setdiff(1:54, parity_pos);
+    code_word = zeros(1, 55);
+    code_word(data_pos) = data_in(:)';
+    for index = 1:numel(parity_pos)
+        position = parity_pos(index);
+        covered = bitget(1:54, log2(position) + 1) ~= 0;
+        covered(position) = false;
+        code_word(position) = mod(sum(code_word(covered)), 2);
     end
-    
-    % Вычисляем контрольные биты Хэмминга (XOR по соответствующим позициям)
-    c(1)  = mod(sum(c([3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37])), 2);
-    c(2)  = mod(sum(c([3, 6, 7, 10, 11, 14, 15, 18, 19, 22, 23, 26, 27, 30, 31, 34, 35, 38])), 2);
-    c(4)  = mod(sum(c([5, 6, 7, 12, 13, 14, 15, 20, 21, 22, 23, 28, 29, 30, 31, 36, 37, 38])), 2);
-    c(8)  = mod(sum(c([9:15, 24:31, 38])), 2); % для сокращенного кода проверяем доступные диапазоны
-    c(16) = mod(sum(c([17:31])), 2);
-    c(32) = mod(sum(c([33:38])), 2);
-    
-    % 39-й бит: Общий паритет (SECDED) — XOR всех предыдущих 38 бит
-    c(39) = mod(sum(c(1:38)), 2);
-    
-    code_word = c;
+    code_word(55) = mod(sum(code_word(1:54)), 2);
 end

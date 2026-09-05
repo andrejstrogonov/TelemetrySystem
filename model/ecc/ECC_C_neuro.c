@@ -1,71 +1,48 @@
 #include <stdint.h>
 
-// Позиции информационных бит в 39-битном слове
-const uint8_t data_pos[32] = {
-    3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 
-    22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 33, 34, 35, 36, 37, 38
-};
-
-// Функция декодирования SECDED
-void ECC_Turbo_Decoder(const uint8_t *r, uint8_t *data_out, uint8_t *ecc_corrected, uint8_t *ecc_uncorrectable) {
-    uint8_t s[6] = {0};
-    uint8_t corrected_r[39];
-    
-    // Копируем принятое слово для возможных исправлений
-    for(int i=0; i<39; i++) corrected_r[i] = r[i];
-    
-    *ecc_corrected = 0;
-    *ecc_uncorrectable = 0;
-
-    // 1. Вычисление синдрома (XOR по маскам Хэмминга)
-    // Синдром s0 (проверка позиций: 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37)
-    for(int i = 0; i < 39; i += 2) s[0] ^= r[i];
-    
-    // Синдром s1 (позиции: 2,3, 6,7, 10,11, 14,15, 18,19, 22,23, 26,27, 30,31, 34,35, 38)
-    s[1] = r[1]^r[2]^r[5]^r[6]^r[9]^r[10]^r[13]^r[14]^r[17]^r[18]^r[21]^r[22]^r[25]^r[26]^r[29]^r[30]^r[33]^r[34]^r[37]^r[38];
-    
-    // Синдром s2 (позиции: 4-7, 12-15, 20-23, 28-31, 36-38)
-    s[2] = r[3]^r[4]^r[5]^r[6]^r[11]^r[12]^r[13]^r[14]^r[19]^r[20]^r[21]^r[22]^r[27]^r[28]^r[29]^r[30]^r[35]^r[36]^r[37];
-    
-    // Синдром s3 (позиции: 8-15, 24-31, 38)
-    for(int i=7; i<=14; i++) s[3] ^= r[i];
-    for(int i=23; i<=30; i++) s[3] ^= r[i];
-    s[3] ^= r[37];
-    
-    // Синдром s4 (позиции: 16-31)
-    for(int i=15; i<=30; i++) s[4] ^= r[i];
-    
-    // Синдром s5 (позиции: 32-38)
-    for(int i=31; i<=37; i++) s[5] ^= r[i];
-
-    // Вычисляем десятичное значение синдрома
-    uint8_t syndrome_val = s[0]*1 + s[1]*2 + s[2]*4 + s[3]*8 + s[4]*16 + s[5]*32;
-
-    // 2. Расчет общего паритета слова (XOR всех 39 бит)
+/* Rev A: extended Hamming SEC-DED, 48 data bits -> 55-bit code word. */
+void ECC_Turbo_Decoder(const uint8_t *r, uint8_t *data_out,
+                       uint8_t *ecc_corrected, uint8_t *ecc_uncorrectable) {
+    const uint8_t parity_pos[6] = {1, 2, 4, 8, 16, 32};
+    uint8_t corrected_r[55];
+    uint8_t syndrome = 0;
     uint8_t overall_parity = 0;
-    for(int i = 0; i < 39; i++) overall_parity ^= r[i];
 
-    // 3. Анализ и исправление ошибок
-    if (syndrome_val == 0) {
-        if (overall_parity != 0) {
-            corrected_r[38] ^= 1; // Ошибка в бите общего паритета
-            *ecc_corrected = 1;
-        }
-    } else {
-        if (overall_parity == 1) {
-            // Одиночная ошибка (SEC) -> Исправляем
-            if (syndrome_val <= 39) {
-                corrected_r[syndrome_val - 1] ^= 1; // Корректируем бит (индексы с 0)
-                *ecc_corrected = 1;
+    for (int index = 0; index < 55; ++index) {
+        corrected_r[index] = r[index] & 1U;
+        overall_parity ^= corrected_r[index];
+    }
+
+    for (int parity_index = 0; parity_index < 6; ++parity_index) {
+        const int position = parity_pos[parity_index];
+        uint8_t check = 0;
+        for (int code_position = 1; code_position <= 54; ++code_position) {
+            if ((code_position & position) != 0) {
+                check ^= corrected_r[code_position - 1];
             }
-        } else {
-            // Двойная ошибка (DED) -> Критический сбой данных
-            *ecc_uncorrectable = 1;
+        }
+        if (check != 0) {
+            syndrome = (uint8_t)(syndrome | position);
         }
     }
 
-    // 4. Извлекаем чистые 32 бита данных
-    for (int i = 0; i < 32; i++) {
-        data_out[i] = corrected_r[data_pos[i] - 1];
+    *ecc_corrected = 0;
+    *ecc_uncorrectable = 0;
+    if (syndrome == 0 && overall_parity != 0) {
+        corrected_r[54] ^= 1U;
+        *ecc_corrected = 1;
+    } else if (syndrome != 0 && overall_parity != 0 && syndrome <= 54) {
+        corrected_r[syndrome - 1] ^= 1U;
+        *ecc_corrected = 1;
+    } else if (syndrome != 0 && overall_parity == 0) {
+        *ecc_uncorrectable = 1;
+    }
+
+    int data_index = 0;
+    for (int code_position = 1; code_position <= 54; ++code_position) {
+        if (code_position != 1 && code_position != 2 && code_position != 4 &&
+            code_position != 8 && code_position != 16 && code_position != 32) {
+            data_out[data_index++] = corrected_r[code_position - 1];
+        }
     }
 }

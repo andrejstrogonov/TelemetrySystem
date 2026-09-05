@@ -1,6 +1,6 @@
 %% owon_verify_signals.m
 %  Верификация всех 4 тестовых сигналов через ECC + CRC.
-%  Прогоняет каждый кадр через ecc_hamming_decode и crc8_compute,
+%  Прогоняет каждый кадр через ecc_hamming_decode и crc32_compute,
 %  выводит таблицу PASS/FAIL.
 %
 %  Предварительно: owon_hds242s_config, generate_owon_test_signals
@@ -28,13 +28,13 @@ tests = {
 
 expected_headers = {'Тест', 'ECC статус', 'Syndrome', ...
                     'CRC', 'Ошибки', 'Результат'};
-results = cell(numel(tests)+1, numel(expected_headers));
+results = cell(size(tests, 1) + 1, numel(expected_headers));
 results(1,:) = expected_headers;
 
 pass_count = 0;
 details = struct();
 
-for t = 1:numel(tests)
+for t = 1:size(tests, 1)
     frame_in = tests{t, 2};
 
     % ── ECC декодирование ──
@@ -44,7 +44,7 @@ for t = 1:numel(tests)
     % ── CRC проверка ──
     payload_rcvd = data_out(1:config.frame.payload_bits);
     crc_rcvd     = data_out(config.frame.payload_bits+1:config.frame.data_bits);
-    [crc_recomp, ~] = crc8_compute(payload_rcvd, ...
+    [crc_recomp, ~] = crc32_compute(payload_rcvd, ...
         config.crc.polynomial, config.crc.init, config.crc.xor_out);
     crc_ok = isequal(crc_rcvd, crc_recomp);
 
@@ -77,7 +77,8 @@ for t = 1:numel(tests)
     results(t+1, 6) = {tag};
 
     % ── Детали ──
-    details.(tests{t, 1}) = struct( ...
+    detail_name = matlab.lang.makeValidName(tests{t, 1});
+    details.(detail_name) = struct( ...
         'frame_in',       frame_in, ...
         'data_out',       data_out, ...
         'ecc_status',     ecc_status, ...
@@ -117,9 +118,9 @@ for r = 1:size(results, 1)
 end
 
 %% ── Итог ──
-fprintf('\n=== ИТОГ: %d / %d тестов пройдено ===\n', pass_count, numel(tests));
+fprintf('\n=== ИТОГ: %d / %d тестов пройдено ===\n', pass_count, size(tests, 1));
 
-if pass_count == numel(tests)
+if pass_count == size(tests, 1)
     fprintf('\n  ВСЕ ТЕСТЫ ПРОЙДЕНЫ — сигналы корректны для HDS242S.\n');
 else
     fprintf('\n  ЕСТЬ НЕ ПРОЙДЕННЫЕ ТЕСТЫ — проверьте логику ECC/CRC.\n');
@@ -139,8 +140,8 @@ fprintf('+-------------------+------------------+-------------------+----------+
 %% ── Сохранение результатов ──
 verify_results = struct( ...
     'pass_count', pass_count, ...
-    'total',     numel(tests), ...
-    'all_pass',  pass_count == numel(tests), ...
+    'total',     size(tests, 1), ...
+    'all_pass',  pass_count == size(tests, 1), ...
     'details',   details, ...
     'table',     results, ...
     'timestamp', datestr(now, 'yyyy-mm-dd HH:MM:SS'));

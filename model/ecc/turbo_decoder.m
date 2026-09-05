@@ -1,52 +1,27 @@
 function [data_out, ecc_corrected, ecc_uncorrectable] = turbo_decoder(r)
-    % r: принятое из памяти 39-битное слово
-    
-    % Инициализация флагов
+% TURBO_DECODER  Rev A extended Hamming decoder: 55 bits -> 48 data bits.
+    assert(numel(r) == 55, 'Expected 55-bit code word');
+    parity_pos = [1, 2, 4, 8, 16, 32];
+    data_pos = setdiff(1:54, parity_pos);
+    syndrome = 0;
+    for index = 1:numel(parity_pos)
+        position = parity_pos(index);
+        covered = bitget(1:54, log2(position) + 1) ~= 0;
+        if mod(sum(r(covered)), 2) ~= 0
+            syndrome = syndrome + position;
+        end
+    end
+    overall_error = mod(sum(r), 2) ~= 0;
     ecc_corrected = 0;
     ecc_uncorrectable = 0;
-    
-    % 1. Вычисляем синдром Хэмминга (6 бит)
-    s = zeros(1, 6);
-    s(1) = mod(sum(r([1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37])), 2);
-    s(2) = mod(sum(r([2, 3, 6, 7, 10, 11, 14, 15, 18, 19, 22, 23, 26, 27, 30, 31, 34, 35, 38])), 2);
-    s(3) = mod(sum(r([4, 5, 6, 7, 12, 13, 14, 15, 20, 21, 22, 23, 28, 29, 30, 31, 36, 37, 38])), 2);
-    s(4) = mod(sum(r([8:15, 24:31, 38])), 2);
-    s(5) = mod(sum(r([16:31])), 2);
-    s(6) = mod(sum(r([32:38])), 2);
-    
-    % Преобразуем синдром в десятичное число (индекс ошибочного бита)
-    syndrome_val = s(1)*1 + s(2)*2 + s(3)*4 + s(4)*8 + s(5)*16 + s(6)*32;
-    
-    % 2. Вычисляем общий паритет принятого слова
-    overall_parity = mod(sum(r), 2); % Если ошибок нет, общий паритет должен быть равен 0
-    
-    % 3. Логика SECDED декодирования
-    if syndrome_val == 0
-        if overall_parity == 0
-            % Ошибок нет
-        else
-            % Ошибка в самом бите общего паритета (39)
-            r(39) = mod(r(39) + 1, 2);
-            ecc_corrected = 1;
-        end
-    else
-        if overall_parity == 1
-            % Одиночная ошибка (SEC) — исправляем её
-            if syndrome_val <= 39
-                r(syndrome_val) = mod(r(syndrome_val) + 1, 2);
-                ecc_corrected = 1;
-            end
-        else
-            % Двойная ошибка (DED) — обнаружена, но неисправима
-            ecc_uncorrectable = 1;
-        end
+    if syndrome == 0 && overall_error
+        r(55) = 1 - r(55);
+        ecc_corrected = 1;
+    elseif syndrome ~= 0 && overall_error && syndrome <= 54
+        r(syndrome) = 1 - r(syndrome);
+        ecc_corrected = 1;
+    elseif syndrome ~= 0 && ~overall_error
+        ecc_uncorrectable = 1;
     end
-    
-    % Извлекаем чистые 32 бита данных из исправленного слова
-    data_pos = [3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 21, ...
-        22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 33, 34, 35, 36, 37, 38];
-    data_out = zeros(1, 32);
-    for i = 1:32
-        data_out(i) = r(data_pos(i));
-    end
+    data_out = r(data_pos);
 end

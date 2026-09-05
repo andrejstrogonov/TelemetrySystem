@@ -15,11 +15,11 @@ if length(polyCoeffs) ~= dimension+1
     error('Критическая ошибка: polyCoeffs имеет длину %d, а должна быть 33! Проверьте код.', length(polyCoeffs));
 end
 
-% 2. Начальное состояние: 32 нуля
-initState = zeros(1, dimension);
+% CRC-32/MPEG-2: initial state is 0xFFFFFFFF, represented MSB first.
+initState = ones(1, dimension);
 
-% 3. Final XOR: 32 единицы
-finalXor = ones(1, dimension);
+% CRC-32/MPEG-2: no final XOR.
+finalXor = zeros(1, dimension);
 
 fprintf('Переменные успешно инициализированы:\n');
 fprintf('  polyCoeffs: длина %d (ожидалось 33)\n', length(polyCoeffs));

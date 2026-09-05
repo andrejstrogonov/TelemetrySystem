@@ -5,9 +5,9 @@
 clear; clk = 1;
 
 %% 1. Define Filter & System Parameters
-Fs = 100e6;           % ADC Sampling Frequency: 100 MHz
-Fpass = 10e6;         % Passband: 10 MHz
-Fstop = 15e6;         % Stopband: 15 MHz
+Fs = 100e3;           % Rev A ADC sampling frequency: 100 kSPS
+Fpass = 20e3;         % Rev A passband: 20 kHz
+Fstop = 40e3;         % Rev A stopband: 40 kHz
 Apass = 0.1;          % Passband Ripple (dB)
 Astop = 60;           % Stopband Attenuation (dB)
 
@@ -77,10 +77,10 @@ add_line(subsystem_path, 'Pipeline_Delay/1', 'Out_Filtered_Signal/1', 'autorouti
 
 %% 5. Add External Stimulus for Verification
 add_block('simulink/Sources/Sine Wave', [model_name '/Noise_Signal']);
-set_param([model_name '/Noise_Signal'], 'Frequency', '2*pi*35e6', 'SampleTime', num2str(1/Fs)); % 35 MHz High-frequency noise
+set_param([model_name '/Noise_Signal'], 'Frequency', '2*pi*35e3', 'SampleTime', num2str(1/Fs)); % 35 kHz noise
 
 add_block('simulink/Sources/Sine Wave', [model_name '/Pure_Signal']);
-set_param([model_name '/Pure_Signal'], 'Frequency', '2*pi*2e6', 'SampleTime', num2str(1/Fs));   % 2 MHz Useful signal
+set_param([model_name '/Pure_Signal'], 'Frequency', '2*pi*2e3', 'SampleTime', num2str(1/Fs));   % 2 kHz useful signal
 
 add_block('simulink/Math Operations/Sum', [model_name '/Sum_ADC_Input']);
 add_block('simulink/Sinks/Terminator', [model_name '/Terminator']);

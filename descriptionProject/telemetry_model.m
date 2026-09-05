@@ -2,7 +2,7 @@
 clear; clc; close all;
 
 %% Параметры симуляции
-Fs = 1e6;                % частота дискретизации (Гц)
+Fs = 100e3;              % Rev A ADC sampling rate (MCP3201, 100 kSPS)
 Ts = 1/Fs;               % шаг по времени (с)
 Tsim = 90;               % длительность симуляции (с)
 N = round(Tsim/Ts);      % количество шагов
@@ -99,7 +99,7 @@ signal_raw = signal_raw + anomaly_shift;
 
 % FIR‑фильтр (эмуляция FPGA2)
 N_taps = 31;             % нечётное число коэффициентов
-fc = 10;                 % частота среза (Гц)
+fc = 20e3;               % Rev A FIR passband edge (Hz)
 fir_coeffs = fir1(N_taps-1, 2*fc/Fs);
 signal_filtered = filter(fir_coeffs, 1, signal_raw);
 
@@ -113,10 +113,10 @@ anomaly_flag = double(abs(signal_filtered - signal_smooth) > (0.3 * abs(signal_s
 
 
 %% CRC32‑контроль целостности (эмуляция FPGA1) и Dual-Path логирование
-% Разбиваем поток данных на блоки по M отсчётов
+% Разбиваем поток данных на блоки по M отсчётов; CRC-32/MPEG-2 выполняется в FPGA1.
 M = 128;
 N_blocks = floor(N/M);
-crc_ok = true(N_blocks,1); % в симуляции считаем CRC всегда верным
+crc_ok = true(N_blocks,1); % channel model is ideal in this HIL script
 sequence_id = 1:N_blocks;
 
 % FIX: Предрасчет глобального вектора отклонений один раз перед циклом (для скорости)
@@ -124,7 +124,7 @@ deviation = abs(signal_filtered - signal_smooth);
 
 % Dual‑Path логирование
 % RAM: кольцевой буфер (последние N_ram записей)
-N_ram = 2000;
+N_ram = 512;             % Rev A ring buffer depth
 ram_buffer = zeros(N_ram, 4); % [timestamp, hotspot, pwm, exp_flag]
 ram_head = 1;
 

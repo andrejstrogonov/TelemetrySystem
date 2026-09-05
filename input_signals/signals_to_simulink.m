@@ -53,7 +53,8 @@ all_frames = [test_signals.frame_ideal, ...
               test_signals.frame_burst]; % Размер [32 x 4]
 
 % Преобразуем в формат [32 x 1 x 4]
-all_frames_reshaped = zeros(32, 1, 4);
+frame_length = config.frame.total;
+all_frames_reshaped = zeros(frame_length, 1, 4);
 for k = 1:4
     all_frames_reshaped(:, 1, k) = all_frames(:, k);
 end
@@ -62,10 +63,10 @@ end
 ts_all = struct();
 ts_all.time = (0:3)';
 ts_all.signals.values = all_frames_reshaped;
-ts_all.signals.dimensions = 32;
+ts_all.signals.dimensions = frame_length;
 
 assignin('base', 'ts_all_frames', ts_all);
-fprintf('\n[SIMULINK] ts_all_frames → From Workspace (4 кадра × 32 бита, размерность зафиксирована)\n');
+fprintf('\n[SIMULINK] ts_all_frames → From Workspace (4 кадра × %d бита, размерность зафиксирована)\n', frame_length);
 
 %% ── NRZ-комбинация для аналогового ввода ──
 nrz_all = [test_signals.nrz_voltage{1}(:); ...
