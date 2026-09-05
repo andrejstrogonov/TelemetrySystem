@@ -1,6 +1,6 @@
 %% owon_export_for_simulink.m
-%  Загрузка NRZ-сигналов в Workspace как timeseries
-%  для блоков From Workspace в Simulink.
+%  Загрузка NRZ-сигналов в Workspace как timeseries и структуры
+%  для блоков From Workspace в Simulink с выравниванием размерностей.
 %
 %  Предварительно: owon_hds242s_config, generate_owon_test_signals
 
@@ -26,9 +26,9 @@ for k = 1:4
     ts_bit = timeseries(test_signals.(sprintf('frame_%s', names{k})), ...
                         0:31, 'Name', ts_names{k});
 
-    % NRZ-напряжение как timeseries (8192 точки)
-    ts_nrz = timeseries(test_signals.nrz_voltage{k}, ...
-                        test_signals.time_axis{k}, ...
+    % NRZ-напряжение как timeseries (8192 точки) — СКАЛЯРНЫЙ ПОТОК [1x1]
+    ts_nrz = timeseries(test_signals.nrz_voltage{k}(:), ...
+                        test_signals.time_axis{k}(:), ...
                         'Name', sprintf('nrz_%s', names{k}));
 
     % Сохраняем в Workspace
@@ -41,26 +41,37 @@ for k = 1:4
         test_signals.labels{k}, names{k});
 end
 
-%% ── Комбинированный timeseries (все 4 кадра последовательно) ──
-all_frames = [test_signals.frame_ideal; ...
-              test_signals.frame_single; ...
-              test_signals.frame_double; ...
-              test_signals.frame_burst];
+% Создаем базовую переменную nrz_ideal для первого теста, чтобы схема сразу запускалась
+assignin('base', 'nrz_ideal', evalin('base', 'nrz_ideal'));
 
-% Время: 4 такта, каждый кадр — 1 такт (dt = 1)
+%% ── Комбинированный timeseries (все 4 кадра последовательно) ──
+% Чтобы Simulink понимал вектор размера 32 из структуры, 
+% значения должны быть упакованы в массив размерностью [32 x 1 x Количество_Шагов]
+all_frames = [test_signals.frame_ideal, ...
+              test_signals.frame_single, ...
+              test_signals.frame_double, ...
+              test_signals.frame_burst]; % Размер [32 x 4]
+
+% Преобразуем в формат [32 x 1 x 4]
+all_frames_reshaped = zeros(32, 1, 4);
+for k = 1:4
+    all_frames_reshaped(:, 1, k) = all_frames(:, k);
+end
+
+% Формируем структуру структуры, жестко задавая векторную размерность
 ts_all = struct();
 ts_all.time = (0:3)';
-ts_all.signals.values = all_frames;
+ts_all.signals.values = all_frames_reshaped;
 ts_all.signals.dimensions = 32;
 
 assignin('base', 'ts_all_frames', ts_all);
-fprintf('\n[SIMULINK] ts_all_frames → From Workspace (4 кадра × 32 бита)\n');
+fprintf('\n[SIMULINK] ts_all_frames → From Workspace (4 кадра × 32 бита, размерность зафиксирована)\n');
 
 %% ── NRZ-комбинация для аналогового ввода ──
-nrz_all = [test_signals.nrz_voltage{1}, ...
-           test_signals.nrz_voltage{2}, ...
-           test_signals.nrz_voltage{3}, ...
-           test_signals.nrz_voltage{4}];
+nrz_all = [test_signals.nrz_voltage{1}(:); ...
+           test_signals.nrz_voltage{2}(:); ...
+           test_signals.nrz_voltage{3}(:); ...
+           test_signals.nrz_voltage{4}(:)];
 
 ts_nrz_all = timeseries(nrz_all, ...
     (0:numel(nrz_all)-1) / config.nrz.sample_rate, ...
@@ -69,24 +80,6 @@ ts_nrz_all = timeseries(nrz_all, ...
 assignin('base', 'ts_nrz_all', ts_nrz_all);
 fprintf('[SIMULINK] ts_nrz_all → From Workspace (NRZ всех 4 тестов)\n');
 
-%% ── Инструкция по Simulink ──
-fprintf('\n=== ИНСТРУКЦИЯ SIMULINK ===\n');
-fprintf('  1. Блок From Workspace:\n');
-fprintf('     Variable name: ts_all_frames\n');
-fprintf('     Sample time: 1 (дискретный)\n');
-fprintf('     Interpolate: OFF (для цифровых данных)\n');
-fprintf('     Form output: Array\n\n');
-fprintf('  2. Для NRZ-сигнала (аналоговый вход):\n');
-fprintf('     Variable name: nrz_ideal (или nrz_all)\n');
-fprintf('     Sample time: 1/%d\n', config.nrz.sample_rate);
-fprintf('     Interpolate: ON\n\n');
-fprintf('  3. Подключение блоков:\n');
-fprintf('     ts_all_frames → ECC_Chain → data_out[24] → CRC_Chain → флаги\n');
-fprintf('     ECC_Chain: ecc_corrected, ecc_uncorrectable\n');
-fprintf('     CRC_Chain: crc_ok, crc_error\n\n');
-fprintf('  4. Мониторинг:\n');
-fprintf('     Display: data_out, ecc_corrected, ecc_uncorrectable, crc_ok\n');
-fprintf('     Lamp: зелёный = OK, жёлтый = corrected, красный = error\n');
-fprintf('     Scope: флаги во времени\n\n');
-fprintf('Готово. Переменные в Workspace:\n');
-whos ts_ideal ts_single ts_double ts_burst ts_all_frames ts_nrz_all
+%% ── Проверка Workspace ──
+fprintf('\nГотово. Переменные в Workspace:\n');
+whos ts_ideal ts_single ts_double ts_burst ts_all_frames nrz_ideal ts_nrz_all
