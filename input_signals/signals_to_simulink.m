@@ -1,8 +1,8 @@
 %% owon_export_for_simulink.m
-%  Загрузка NRZ-сигналов в Workspace как timeseries и структуры
-%  для блоков From Workspace в Simulink с выравниванием размерностей.
+% Загрузка NRZ-сигналов в Workspace как timeseries и структуры
+% для блоков From Workspace в Simulink с выравниванием размерностей.
 %
-%  Предварительно: owon_hds242s_config, generate_owon_test_signals
+% Предварительно: owon_hds242s_config, generate_owon_test_signals
 
 clear; clc;
 
@@ -17,16 +17,26 @@ end
 
 fprintf('\n=== ЭКСПОРТ ДЛЯ SIMULINK ===\n\n');
 
+% Динамически берем длину кадра из конфигурации
+frame_length = config.frame.total; 
+
 %% ── Создание timeseries для каждого сигнала ──
 names   = test_signals.names;
 ts_names = {'ts_ideal', 'ts_single', 'ts_double', 'ts_burst'};
 
 for k = 1:4
-    % Битовый кадр как timeseries (1 значение на такт)
-    ts_bit = timeseries(test_signals.(sprintf('frame_%s', names{k})), ...
-                        0:31, 'Name', ts_names{k});
+    % Извлекаем кадр и принудительно делаем его строкой 1xN
+    current_frame = test_signals.(sprintf('frame_%s', names{k}));
+    current_frame = current_frame(:)'; 
+    
+    % Вектор времени от 0 до N-1, тоже в виде строки 1xN
+    % Это гарантирует совпадение размерностей для timeseries
+    time_bit = 0:(frame_length - 1);
 
-    % NRZ-напряжение как timeseries (8192 точки) — СКАЛЯРНЫЙ ПОТОК [1x1]
+    % Битовый кадр как timeseries (1 значение на такт)
+    ts_bit = timeseries(current_frame, time_bit, 'Name', ts_names{k});
+
+    % NRZ-напряжение как timeseries (скалярный поток, вытягиваем в столбец)
     ts_nrz = timeseries(test_signals.nrz_voltage{k}(:), ...
                         test_signals.time_axis{k}(:), ...
                         'Name', sprintf('nrz_%s', names{k}));
@@ -41,25 +51,24 @@ for k = 1:4
         test_signals.labels{k}, names{k});
 end
 
-% Создаем базовую переменную nrz_ideal для первого теста, чтобы схема сразу запускалась
+% Создаем базовую переменную nrz_ideal в базовом Workspace для первого теста
 assignin('base', 'nrz_ideal', evalin('base', 'nrz_ideal'));
 
 %% ── Комбинированный timeseries (все 4 кадра последовательно) ──
-% Чтобы Simulink понимал вектор размера 32 из структуры, 
-% значения должны быть упакованы в массив размерностью [32 x 1 x Количество_Шагов]
-all_frames = [test_signals.frame_ideal, ...
-              test_signals.frame_single, ...
-              test_signals.frame_double, ...
-              test_signals.frame_burst]; % Размер [32 x 4]
+% Чтобы Simulink понимал вектор размера N из структуры, 
+% значения упаковываем в массив размерностью [Длина_Кадра x 1 x Количество_Шагов]
+all_frames = [test_signals.frame_ideal(:), ...
+              test_signals.frame_single(:), ...
+              test_signals.frame_double(:), ...
+              test_signals.frame_burst(:)]; % Гарантированный размер [N x 4]
 
-% Преобразуем в формат [32 x 1 x 4]
-frame_length = config.frame.total;
+% Преобразуем в формат [Длина_Кадра x 1 x 4]
 all_frames_reshaped = zeros(frame_length, 1, 4);
 for k = 1:4
     all_frames_reshaped(:, 1, k) = all_frames(:, k);
 end
 
-% Формируем структуру структуры, жестко задавая векторную размерность
+% Формируем структуру, жестко задавая векторную размерность
 ts_all = struct();
 ts_all.time = (0:3)';
 ts_all.signals.values = all_frames_reshaped;
@@ -83,4 +92,4 @@ fprintf('[SIMULINK] ts_nrz_all → From Workspace (NRZ всех 4 тестов)\
 
 %% ── Проверка Workspace ──
 fprintf('\nГотово. Переменные в Workspace:\n');
-whos ts_ideal ts_single ts_double ts_burst ts_all_frames nrz_ideal ts_nrz_all
+evalin('base', 'whos ts_ideal ts_single ts_double ts_burst ts_all_frames nrz_ideal ts_nrz_all');
