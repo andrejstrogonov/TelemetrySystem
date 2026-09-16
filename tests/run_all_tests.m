@@ -45,32 +45,35 @@ for id = 1:4
         
         %% === БЛОК ПОСТРОЕНИЯ ГРАФИКОВ СБОЕВ ===
         try
-            % 1. Получаем доступ к логированным сигналам (по умолчанию это logsout)
+            % 1. Получаем доступ к логированным сигналам (из объекта SimulationOutput)
             logs = sim_out.logsout;
             
-            % !!! ВНИМАНИЕ: Замените 'input_signal' и 'crc_error_flag' на реальные 
-            % имена сигналов, которые у вас настроены на логирование (Data Logging) в модели.
-            sig_data = logs.get('input_signal').Values;      % Входной цифровой сигнал
-            err_data = logs.get('crc_error_flag').Values;  % Флаг ошибки (0 - норм, 1 - сбой)
+            % ИСПРАВЛЕНО: Указаны реальные имена сигналов из вашей модели Simulink
+            sig_data = logs.get('ts_switch').Values;  % Входной цифровой сигнал
+            err_data = logs.get('crc_out').Values;    % Флаг ошибки (выходной сигнал)
             
             % 2. Создаем новое окно для каждого теста
             figure('Name', sprintf('Сценарий: %s', test_labels{id}), 'Color', 'w');
             
-            % Верхний подграфик: Исходный сигнал/тракт
+            % Верхний подграфик: Входной сигнал
             subplot(2,1,1);
             plot(sig_data.Time, sig_data.Data, 'LineWidth', 1.5, 'Color', [0 0.4470 0.7410]);
             grid on;
-            title(sprintf('Входной сигнал (Тест: %s)', test_labels{id}));
+            title(sprintf('Входной сигнал ts\\_switch (Тест: %s)', test_labels{id}));
             ylabel('Амплитуда / Бит');
             
-            % Нижний подграфик: Флаг фиксации ошибок
+            % Нижний подграфик: Выходной сигнал / статус CRC
             subplot(2,1,2);
             stem(err_data.Time, err_data.Data, 'LineWidth', 1.5, 'Color', [0.8500 0.3250 0.0980], 'Marker', 'x');
             grid on;
-            title('Маркеры фиксации сбоев блоком CRC');
+            title('Выходной сигнал фиксации сбоев crc\\_out');
             xlabel('Время (с)');
-            ylabel('Статус сбоя (0/1)');
-            ylim([-0.2 1.2]); % Ограничим по высоте для наглядности флага
+            ylabel('Статус сбоя');
+            
+            % Настройка лимитов для нижнего графика на случай, если данные бинарные (0/1)
+            if max(err_data.Data) <= 1 && min(err_data.Data) >= 0
+                ylim([-0.2 1.2]); 
+            end
             
             fprintf('  [ГРАФИК]: Окно визуализации сбоев успешно создано.\n\n');
             
