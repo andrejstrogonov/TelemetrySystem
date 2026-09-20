@@ -1,7 +1,7 @@
 %% run_all_tests.m
 % Автоматический запуск тестов цифрового тракта для всех сценариев Owon
 
-% ИСПРАВЛЕНО: Добавлены маски ts_* и nrz_* для сохранения всех тестовых сигналов
+% ИСПРАВЛЕНО: Сохраняем переменные окружения
 clearvars -except test_signals config ts_* nrz_*; 
 clc;
 
@@ -35,43 +35,60 @@ load_system(model_name);
 for id = 1:4
     fprintf('[ТЕСТ %d/4] Запуск сценария: %s...\n', id, test_labels{id});
     
-    assignin('base', 'Scenario_ID', id);
+    % 1. Инициализируем объект конфигурации симуляции
+    sim_in = Simulink.SimulationInput(model_name);
     
-    % Запуск симуляции
-    sim_out = sim(model_name, 'CaptureErrors', 'on');
+    % Передаем переменную Scenario_ID в локальный воркспейс симуляции
+    sim_in = sim_in.setVariable('Scenario_ID', id);
+    
+    % РЕШЕНИЕ ПРОБЛЕМЫ ИДЕНТИЧНЫХ КАРТИНОК:
+    % Принудительно заставляем блок Constant, управляющий переключателем ts_switch,
+    % принимать текущее значение шага цикла (id).
+    % ВНИМАНИЕ: Если блок константы на схеме называется не Scenario_ID, замените имя ниже.
+    sim_in = sim_in.setBlockParameter([model_name '/Scenario_ID'], 'Value', num2str(id));
+    
+    % Включаем безопасный перехват ошибок симуляции внутри объекта sim_in
+    sim_in = sim_in.setModelParameter('CaptureErrors', 'on');
+    
+    % 2. Запуск симуляции с обновленным объектом настроек
+    sim_out = sim(sim_in);
     
     if isempty(sim_out.ErrorMessage)
         fprintf('  [СТАТУС]: Успешно завершено.\n');
         
         %% === БЛОК ПОСТРОЕНИЯ ГРАФИКОВ СБОЕВ ===
         try
-            % 1. Получаем доступ к логированным сигналам (из объекта SimulationOutput)
+            % Доступаемся до сохраненного Dataset сигналов
             logs = sim_out.logsout;
             
-            % ИСПРАВЛЕНО: Указаны реальные имена сигналов из вашей модели Simulink
-            sig_data = logs.get('ts_switch').Values;  % Входной цифровой сигнал
-            err_data = logs.get('crc_out').Values;    % Флаг ошибки (выходной сигнал)
+            % Извлекаем объекты сигналов
+            sig_obj = logs.get('ts_switch').Values;  % Входной цифровой сигнал
+            err_obj = logs.get('crc_out').Values;    % Выходной флаг сбоя CRC
             
-            % 2. Создаем новое окно для каждого теста
+            % ИСПРАВЛЕНО РАНЕЕ: Принудительный squeeze для удаления 3D размерностей (1x1xN -> Nx1)
+            sig_data_fixed = squeeze(sig_obj.Data);
+            err_data_fixed = squeeze(err_obj.Data);
+            
+            % Создаем новое окно для каждого теста
             figure('Name', sprintf('Сценарий: %s', test_labels{id}), 'Color', 'w');
             
             % Верхний подграфик: Входной сигнал
             subplot(2,1,1);
-            plot(sig_data.Time, sig_data.Data, 'LineWidth', 1.5, 'Color', [0 0.4470 0.7410]);
+            plot(sig_obj.Time, sig_data_fixed, 'LineWidth', 1.5, 'Color', [0 0.4470 0.7410]);
             grid on;
             title(sprintf('Входной сигнал ts\\_switch (Тест: %s)', test_labels{id}));
             ylabel('Амплитуда / Бит');
             
             % Нижний подграфик: Выходной сигнал / статус CRC
             subplot(2,1,2);
-            stem(err_data.Time, err_data.Data, 'LineWidth', 1.5, 'Color', [0.8500 0.3250 0.0980], 'Marker', 'x');
+            stem(err_obj.Time, err_data_fixed, 'LineWidth', 1.5, 'Color', [0.8500 0.3250 0.0980], 'Marker', 'x');
             grid on;
             title('Выходной сигнал фиксации сбоев crc\\_out');
             xlabel('Время (с)');
             ylabel('Статус сбоя');
             
-            % Настройка лимитов для нижнего графика на случай, если данные бинарные (0/1)
-            if max(err_data.Data) <= 1 && min(err_data.Data) >= 0
+            % Динамическая настройка лимитов по оси Y для бинарных состояний
+            if max(err_data_fixed) <= 1 && min(err_data_fixed) >= 0
                 ylim([-0.2 1.2]); 
             end
             
