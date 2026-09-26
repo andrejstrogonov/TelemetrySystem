@@ -1,6 +1,11 @@
 function [code_word, hamming_word] = ecc_hamming_encode(data_bits, config)
 % ECC_HAMMING_ENCODE  Extended Hamming SEC-DED for 48 data + 6 parity + overall.
 
+    if nargin < 1
+        error('ecc_hamming_encode:MissingInput', ...
+            'Pass one 48-bit data vector: ecc_hamming_encode(data_bits, config).');
+    end
+
     if nargin < 2 || isempty(config)
         parity_pos = [1, 2, 4, 8, 16, 32];
         code_length = 54;
@@ -10,7 +15,8 @@ function [code_word, hamming_word] = ecc_hamming_encode(data_bits, config)
         code_length = config.hamming.code_length;
         info_pos = config.hamming.info_pos;
     end
-    assert(numel(data_bits) == numel(info_pos), 'Expected 48 data bits');
+    assert(numel(data_bits) == numel(info_pos), ...
+        'Expected %d data bits, got %d.', numel(info_pos), numel(data_bits));
 
     hamming_word = zeros(1, code_length);
     hamming_word(info_pos) = double(data_bits(:)');

@@ -20,6 +20,20 @@ fprintf('\n=== ЭКСПОРТ ДЛЯ SIMULINK ===\n\n');
 % Динамически берем длину кадра из конфигурации
 frame_length = config.frame.total; 
 
+% MATLAB Function-блоку ecc_hamming_encode нужен исходный вектор из 48
+% бит, а ts_all_frames ниже содержит уже закодированные кадры длиной 55 бит.
+% Экспортируем исходные данные отдельно как векторный сигнал для From Workspace.
+data_bits = test_signals.data_48(:)';
+assert(numel(data_bits) == config.hamming.info_length, ...
+    'Ожидалось %d исходных бит, получено %d.', ...
+    config.hamming.info_length, numel(data_bits));
+ts_data_bits = struct();
+ts_data_bits.time = 0;
+ts_data_bits.signals.values = data_bits;
+ts_data_bits.signals.dimensions = numel(data_bits);
+assignin('base', 'ts_data_bits', ts_data_bits);
+fprintf('[SIMULINK] ts_data_bits → From Workspace (вход кодера, %d бит)\n', numel(data_bits));
+
 %% ── Создание timeseries для каждого сигнала ──
 names   = test_signals.names;
 ts_names = {'ts_ideal', 'ts_single', 'ts_double', 'ts_burst'};
@@ -92,4 +106,4 @@ fprintf('[SIMULINK] ts_nrz_all → From Workspace (NRZ всех 4 тестов)\
 
 %% ── Проверка Workspace ──
 fprintf('\nГотово. Переменные в Workspace:\n');
-evalin('base', 'whos ts_ideal ts_single ts_double ts_burst ts_all_frames nrz_ideal ts_nrz_all');
+evalin('base', 'whos ts_data_bits ts_ideal ts_single ts_double ts_burst ts_all_frames nrz_ideal ts_nrz_all');

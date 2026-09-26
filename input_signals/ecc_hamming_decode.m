@@ -1,6 +1,11 @@
 function [data_out, status, syndrome, corrected_word] = ecc_hamming_decode(code_word, config)
 % ECC_HAMMING_DECODE  Extended Hamming SEC-DED for a 55-bit code word.
 
+    if nargin < 1
+        error('ecc_hamming_decode:MissingInput', ...
+            'Pass one 55-bit code vector: ecc_hamming_decode(code_word, config).');
+    end
+
     if nargin < 2 || isempty(config)
         parity_pos = [1, 2, 4, 8, 16, 32];
         code_length = 54;
@@ -10,7 +15,8 @@ function [data_out, status, syndrome, corrected_word] = ecc_hamming_decode(code_
         code_length = config.hamming.code_length;
         info_pos = config.hamming.info_pos;
     end
-    assert(numel(code_word) == code_length + 1, 'Expected 55-bit code word');
+    assert(numel(code_word) == code_length + 1, ...
+        'Expected %d-bit code word, got %d.', code_length + 1, numel(code_word));
 
     corrected_word = double(code_word(:)');
     hamming_word = corrected_word(1:code_length);
