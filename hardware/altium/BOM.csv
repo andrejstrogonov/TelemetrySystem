@@ -1,0 +1,35 @@
+Designator,Qty,Manufacturer,Manufacturer Part Number,Description,Package,Net/rail,Status
+J1,1,CUI Devices,PJ-102A,2.1 mm center-positive DC input jack,TH,12V_IN,Selected verify mechanical fit
+F1,1,Littelfuse,1812L110/16DR,Resettable fuse 1.1 A hold 16 V,1812,12V_IN,Selected verify derating
+Q1,1,Diodes Incorporated,AO3401A,Reverse-polarity P-channel MOSFET,SOT-23,VIN_PROTECTED,Selected verify SOA
+D1,1,Littelfuse,SMCJ15A,15 V standoff TVS diode,DO-214AB,VIN_PROTECTED,Selected
+U1,1,Texas Instruments,TPS54302DDCR,12 V to 5V5 synchronous buck 3 A,SOT-23-6,5V5,Selected values require WEBENCH
+L1,1,Coilcraft,XAL5030-103ME,10 uH shielded power inductor,5.0 x 5.0 mm,5V5,Preliminary verify saturation current
+R1,1,Generic,82.5k 1%,U1 feedback upper resistor,0603,5V5,Preliminary
+R2,1,Generic,10.0k 1%,U1 feedback lower resistor,0603,GND,Preliminary
+U2,1,Texas Instruments,TPS62160DSGR,5V5 to 1V2 FPGA core buck 1 A,WSON-10,1V2_CORE,Selected verify current budget
+L2,1,Generic,2.2uH 2A shielded,1V2 buck inductor,4 x 4 mm,1V2_CORE,Preliminary
+R3,1,Generic,49.9k 1%,U2 feedback upper resistor,0603,1V2_CORE,Preliminary
+R4,1,Generic,100k 1%,U2 feedback lower resistor,0603,GND,Preliminary
+U3,1,Texas Instruments,TPS62160DSGR,5V5 to 3V3 I/O buck 1 A,WSON-10,3V3_IO,Selected verify current budget
+L3,1,Generic,2.2uH 2A shielded,3V3 buck inductor,4 x 4 mm,3V3_IO,Preliminary
+R5,1,Generic,316k 1%,U3 feedback upper resistor,0603,3V3_IO,Preliminary
+R6,1,Generic,100k 1%,U3 feedback lower resistor,0603,GND,Preliminary
+U4,1,Gowin,GW1NR-LV9QN88PC6/I5,FPGA1 acquisition/CRC,QN88 BGA,1V2_CORE + 3V3_IO,Selected verify ordering code and package land pattern
+U5,1,Gowin,GW1NR-LV9QN88PC6/I5,FPGA2 ECC/ring/snapshot,QN88 BGA,1V2_CORE + 3V3_IO,Selected verify ordering code and package land pattern
+U6,1,STMicroelectronics,STM32G0B1CBT6,MCU gateway LQFP-48,LQFP-48,3V3_IO,Selected verify pin assignment
+U7,1,Microchip,MCP3201-CI/P,12-bit SPI ADC DIP-8,PDIP-8,3V3_IO + VREF,Selected
+U8,1,Winbond,W25Q128JVSIQ,128 Mbit QSPI NOR flash,SOIC-8,3V3_IO,Selected
+U9,1,MaxLinear,SP3485EN-L/TR,3V3 half-duplex RS-485 transceiver,SOIC-8,3V3_IO,Selected
+D2,1,Semtech,SM712-02HTG,RS-485 line TVS protection,SOIC-8,RS485_A/B,Selected
+D3,1,Texas Instruments,TPD1E10B06,Signal input ESD protection,SOD-523,SIG_IN,Selected verify input capacitance
+U10,1,STMicroelectronics,USBLC6-2SC6,USB FS ESD protection,SOT-23-6,USB_DM/DP,Selected
+J2,1,Amphenol RF,BNC panel connector 50 Ohm,BNC edge/panel,0..3V3 SIG_IN,Selected family choose exact PCB mount MPN
+J3,1,Phoenix Contact,1757242,3-position 5.08 mm RS-485 terminal block,TH,RS485_A/B/GND,Selected verify orientation
+J4,1,GCT,USB4105-GF-A,USB-C receptacle USB 2.0,USB-C mid-mount,USB service only,Selected verify footprint
+J5,1,Generic,SWD 1x6 2.54 mm,MCU SWD header,TH,SWD,Selected
+J6,1,Generic,JTAG 2x5 2.54 mm,Independent FPGA1 JTAG header,TH,JTAG1,Selected
+J7,1,Generic,JTAG 2x5 2.54 mm,Independent FPGA2 JTAG header,TH,JTAG2,Selected
+LED1,1,Lumex,SSL-LX3044GD,Green POWER indicator,3 mm TH,POWER_GOOD,Selected verify bezel
+R7,1,Generic,1.0k 1%,POWER LED current limit,0603,3V3_IO,Preliminary
+C1-C20,20,Generic,100nF X7R 10V,Local IC decoupling,0603,3V3_IO/1V2_CORE,Populate per pin/rail layout

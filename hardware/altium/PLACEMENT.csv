@@ -1,0 +1,13 @@
+RefDes,Zone,Constraint
+J1,Front-left,12V power connector; keep clear of SIG_IN and label polarity
+J2,Front-left-center,BNC short direct path to input protection and MCP3201
+J3,Front-right-center,RS-485 terminal block with TVS adjacent to connector
+J4,Front-right,USB-C service only; ESD device next to receptacle
+LED1,Front-center,Only enclosure indicator; driven by hardware POWER_GOOD
+J5,Front-service-hatch,MCU SWD header
+J6,Front-service-hatch,FPGA1 JTAG header
+J7,Front-service-hatch,FPGA2 JTAG header; no shared JTAG chain
+U6,Analog-front-left,ADC next to BNC; keep away from switch-node copper
+U1,Power-left-rear,12V buck input loop compact; thermal keepout
+U2 U3,Power-center-rear,Separate 1V2/3V3 buck loops; sequence 1V2 then 3V3
+U4 U5,Digital-center,FPGA pair near source-synchronous interface; MCU near UART/USB/SPI

@@ -1,0 +1,28 @@
+Net,From,To,Class,Notes
+12V_IN,J1.1,F1.1,Power,12 V center positive
+GND,J1.2;J2.shell;J3.3;J4.GND;J5.GND;J6.GND;J7.GND,All GND pins,Ground,Single common return with AGND/DGND join near ADC as layout requires
+VIN_PROTECTED,F1.2;Q1;D1,U1.VIN;U2.VIN;U3.VIN,Power,Reverse protection and TVS ahead of regulator input
+5V5,U1.OUT,Cbulk;U2.VIN;U3.VIN;testpoint,Power,No connection to digital I/O
+1V2_CORE,U2.OUT,U4.VCC_CORE pins;TP_1V2,Power,Use exact Gowin pin map and decoupling
+3V3_IO,U3.OUT,U4.VCCIO;U5.VCCIO;U6.VDD;U7.VDD/VREF;U8.VCC;U9.VCC;USB logic;TP_3V3,Power,All external logic levels are 3V3
+PG_1V2,U2.PG,U3.EN;U6.power_fault_monitor,Control,Enable 3V3 only after core power is good
+PG_3V3,U3.PG,POWER_GOOD logic;U6.power_fault_monitor,Control,Open-drain pullup to 3V3
+SIG_IN,J2.center,D3;RIN;U7.CH0,Analog,0..3.3 V fixed Owon input; passive input protection only
+ADC_SCK,U6.SPI1_SCK,U7.CLK;U4.FPGA1_ADC_SCK,Digital,3V3
+ADC_DOUT,U7.DOUT,U4.FPGA1_ADC_DOUT,Digital,3V3
+ADC_CS_CONV,U4.FPGA1_GPIO,U7.CS_SHDN,Digital,Check MCP3201 timing and pin function
+FPGA1_FPGA2_CLK,U4.FPGA1_CLK,U5.FPGA2_CLK,Digital,Source-synchronous 3V3 interface
+FPGA1_FPGA2_DATA[7:0],U4.FPGA1_DATA[7:0],U5.FPGA2_DATA[7:0],Digital,Frame/valid/CRC status nets also required
+FPGA2_SPI_SCK,U6.SPI1_SCK,U5.FPGA2_SPI_SCK,Digital,MCU master with DMA
+FPGA2_SPI_MOSI,U6.SPI1_MOSI,U5.FPGA2_SPI_MOSI,Digital,Status/control request
+FPGA2_SPI_MISO,U5.FPGA2_SPI_MISO,U6.SPI1_MISO,Digital,34-byte TS v1 telemetry frame
+FPGA2_CS,U6.GPIO,U5.FPGA2_CS,Digital,Active low
+RS485_TX,U6.USART2_TX,U9.DI,Digital,3V3
+RS485_RX,U9.RO,U6.USART2_RX,Digital,3V3
+RS485_DE,U6.GPIO,U9.DE;U9./RE,Digital,Half-duplex direction
+RS485_A_B,U9.A;U9.B,D2;J3.1;J3.2,External,Termination only at designated end
+USB_DM_DP,J4.DM;J4.DP,U10;U6.USB_DM;U6.USB_DP,Digital,Service only; USB VBUS must not backfeed board rails
+SWD,U6.SWDIO;U6.SWCLK;U6.NRST,J5.2;J5.4;J5.5,Programming,3V3 and GND included at header
+FPGA1_JTAG,U4.FPGA1_TCK/TMS/TDI/TDO,J6.1..10,Programming,Assign exact QN88 balls from Gowin pinout
+FPGA2_JTAG,U5.FPGA2_TCK/TMS/TDI/TDO,J7.1..10,Programming,Independent chain and reset/program controls
+QSPI,U5.FPGA2_QSPI_IO[0:3];U5.QSPI_CLK;U5.QSPI_CS,U8.IO[0:3];U8.CLK;U8.CS,Digital,3V3 with local decoupling

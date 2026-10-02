@@ -13,20 +13,13 @@ componentDiagram
         port "fault_flags" as Power_Fault
     }
 
-    component "Plant (объект + возмущения)" as Plant {
-        port "(in) input_signal" as Plant_In
-        port "(out) output_signal / y[k]" as Plant_Out
-        port "(out) w[k], v[k] (возмущения)" as Plant_Noise
+    component "Owon HDS242S (фиксированные тестовые сигналы)" as Owon {
+        port "(out) SIG_IN, 0...3.3 V" as Owon_Out
     }
 
     component "MCP3201-CI/P (12-bit, 100 kSPS)" as ADC {
         port "(in) signal_In" as ADC_In
         port "(out) signal_Out" as ADC_Out
-    }
-
-    component "ADC_Filter (DSP)" as Filter {
-        port "(in) signal_In" as Filter_In
-        port "(out) signal_out" as Filter_Out
     }
 
     component "CRC_Chain (CRC-32/MPEG-2)" as CRC {
@@ -121,21 +114,17 @@ componentDiagram
 
 
     %% Соединения: выход → вход с размерностями/смыслом
-    Power_Vout --> Plant_In : питание объекта
     Power_Fault --> STM_ECC : флаги ошибок питания → телеметрия
 
-    Plant_Out --> ADC_In : y[k] → квантование
-    Plant_Noise --> ChannelErr_ErrIn : w[k],v[k] → ошибки канала
-    Plant_Noise --> Inject_Out : w[k],v[k] → тестовые битовые ошибки
+    Owon_Out --> ADC_In : фиксированная тестовая осциллограмма
 
-    ADC_Out --> Filter_In : квантованный сигнал
-    Filter_Out --> CRC_In : поток для CRC
-    Filter_Out --> ECC_Enc_In : данные для ECC кодирования
-    Filter_Out --> Anom_InSig : сигнал для детекции аномалий
+    ADC_Out --> CRC_In : ADC sample без цифровой фильтрации
+    ADC_Out --> Anom_InSig : отсчёт для детекции аномалий
 
     CRC_In --> CRCGen : данные на CRC
     CRC_StartIn --> const_start : старт пакета (константа/автомат)
     CRC_Out --> Channel_In : передача через канал с ошибками
+    CRC_Out --> ECC_Enc_In : 48-битные sample + CRC для SEC-DED
     Channel_Out --> CRCDet : искажённые данные на детектор
     CRCDet --> STM_CRC : errFlag → телеметрия
     CRCDet --> SF_CRC : validEndOut → автомат состояний
@@ -166,7 +155,7 @@ componentDiagram
 ## 1. Распределение компонентов по чипам (Топология)
 
 * **FPGA 1 (Gowin GW1NR-9C): Тракт первичной обработки и контроля целостности**
-  * `ADC_Filter (DSP)`
+    * ADC acquisition без цифрового фильтра
     * `CRC_Chain (CRC-32/MPEG-2)`
   * `ChannelErr`
   * `AnomalyDet`
@@ -202,14 +191,14 @@ componentDiagram
 Для связи между компонентами внутри кристаллов и между чипами формируются следующие унифицированные шины:
 
 ### 📊 Шина АЦП (Параллельная/SPI)
-* **Соединение:** `ADC` -> `FPGA 1 (Filter_In)`
+* **Соединение:** `ADC` -> `FPGA 1 (CRC_In / Anom_InSig)`
 * **Состав:** `ADC_SCK`, `ADC_DOUT`, `ADC_CONV`, `ADC_CS_N`; последовательный SPI, 12-битный код.
 
-### 🎛️ Внутренняя шина ЦОС (Внутри FPGA 1)
-* **Соединение:** `Filter_Out` -> `CRC_In` / `ECC_Enc_In` / `Anom_InSig`
-* **Тип:** **AXI4-Stream (DSP profile)**
+### 🎛️ Внутренняя шина данных (Внутри FPGA 1)
+* **Соединение:** `CRC_Out` -> `ECC_Enc_In`; `ADC_Out` -> `Anom_InSig`
+* **Тип:** поток ADC sample в CRC без цифровой фильтрации
 * **Состав:**
-  * `tdata[15:0]`: Фильтрованный сигнал (16-бит со знаком).
+    * `tdata[15:0]`: signed Q1.15 sample из ADC.
   * `tvalid`: Флаг валидности отсчета.
   * `tlast`: Маркер конца кадра / пакета телеметрии.
 
@@ -222,7 +211,7 @@ componentDiagram
 * **Соединение:** `ECC_Enc` -> `RAM_Ring` -> `ECC_Dec`
 * **Тип:** **System Memory Bus**
 * **Состав:**
-    * `DATA_BUS[47:0]`: 16-битный payload + 32-битный CRC.
+    * `DATA_BUS[15:0]`: signed Q1.15 sample; `DATA_BUS[47:16]`: CRC-32/MPEG-2.
     * `ECC_BUS[6:0]`: 6 бит Хемминга + 1 общий parity; полное кодовое слово — 55 бит.
   * `WR_EN` / `RD_EN`: Сигналы записи и чтения кольцевого буфера.
 
@@ -249,6 +238,10 @@ componentDiagram
 * `J5 MCU_PROG`: отдельный SWD STM32 (`3V3`, `SWDIO`, `SWCLK`, `NRST`, `SWO`, `GND`).
 * `J6 FPGA1_PROG`: отдельный JTAG FPGA1 (`3V3`, `TCK`, `TMS`, `TDI`, `TDO`, `TRST_N`, `PROGRAM_N`, `GND`).
 * `J7 FPGA2_PROG`: отдельный JTAG FPGA2 с тем же набором сигналов; J6 и J7 не объединять.
+
+## 5. Передняя панель корпуса
+
+Все пользовательские соединения расположены на одной передней стороне: в одном ряду `J1 POWER`, `J2 SIG_IN`, `J3 EXT_LINK`, `J4 SERVICE_USB` и индикатор `POWER`. Порты `J5 MCU_PROG`, `J6 FPGA1_PROG` и `J7 FPGA2_PROG` находятся за съёмным сервисным лючком на этой же стороне. Задняя панель закрытая; детали компоновки заданы в [ENCLOSURE_SPECIFICATION.md](ENCLOSURE_SPECIFICATION.md).
 
 ---
 

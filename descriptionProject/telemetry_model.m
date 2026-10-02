@@ -47,8 +47,6 @@ load_factor(round(0.3*N):end) = 1.5;
 load_factor(round(0.6*N):end) = 2.0;
 P = P_base(:) * load_factor';
 
-T = T_amb * ones(3, N+1); % T(1,:) FPGA1, T(2,:) FPGA2, T(3,:) STM32
-
 %% ПИ‑регулятор и вентилятор (Исправленная версия)
 T_target = 70;           % целевая температура (°C)
 T_max_safe = 85;         % аварийный порог (°C)
@@ -59,7 +57,7 @@ error_int = 0;
 % Предвыделение памяти (N берется из вашего прошлого скрипта, например 60000)
 pwm_duty = zeros(N, 1);   
 pin_exp = zeros(N, 1);     
-T = zeros(3, N);          
+T = T_amb * ones(3, N);
 
 % Гарантируем, что базовые параметры являются векторами-столбцами (3x1)
 tau = tau(:);
@@ -111,32 +109,19 @@ end
 pwm_duty(N) = pwm_duty(N-1); 
 pin_exp(N) = double(max(T(:, N)) > T_max_safe);
 
-%% Фильтрация сигнала и детектирование аномалий (FPGA2) - Оптимизированный
-% Входной сигнал: синусоида + ступенчатые выбросы
-f_sig = 5;                % частота полезного сигнала (Гц)
-A_sig = 1;                % амплитуда
-signal_raw = A_sig * sin(2*pi*f_sig*t);
-
-% ОПТИМИЗАЦИЯ: Векторизованное добавление ступенчатых аномалий без циклов
-% Создаем один комбинированный вектор смещения и применяем его за один шаг
-anomaly_shift = zeros(size(signal_raw));
-anomaly_shift(round(0.4*N):end) = anomaly_shift(round(0.4*N):end) + 0.5*A_sig;
-anomaly_shift(round(0.75*N):end) = anomaly_shift(round(0.75*N):end) + 0.5*A_sig;
-signal_raw = signal_raw + anomaly_shift;
-
-% FIR‑фильтр (эмуляция FPGA2)
-N_taps = 31;             % нечётное число коэффициентов
-fc = 20e3;               % Rev A FIR passband edge (Hz)
-fir_coeffs = fir1(N_taps-1, 2*fc/Fs);
-signal_filtered = filter(fir_coeffs, 1, signal_raw);
-
-% Скользящее среднее для детектирования аномалий
-window_size = round(0.1*Fs); % 100 мс
-signal_smooth = movmean(signal_filtered, window_size, 'Endpoints','shrink');
-
-% ОПТИМИЗАЦИЯ: Избегаем промежуточных переменных, считаем флаг напрямую одной операцией.
-% Также используем abs(signal_smooth), чтобы избежать ложных срабатываний, когда синусоида уходит в минус.
-anomaly_flag = double(abs(signal_filtered - signal_smooth) > (0.3 * abs(signal_smooth)));
+%% Фиксированный Owon-вход и детектор аномалий без цифровой фильтрации
+project_root = fileparts(fileparts(mfilename('fullpath')));
+owon_data = load(fullfile(project_root, 'owon_output', 'owon_test_signals.mat'), 'test_signals');
+test_signals = owon_data.test_signals;
+owon_rate = test_signals.config.nrz.sample_rate;
+owon_input = test_signals.nrz_voltage{2}(:);
+owon_reference = test_signals.nrz_voltage{1}(:);
+owon_index = mod(floor(t * owon_rate), numel(owon_input)) + 1;
+signal_raw = owon_input(owon_index);
+signal_reference = owon_reference(owon_index);
+deviation = abs(signal_raw - signal_reference);
+threshold_dev = 0.3 * abs(signal_reference);
+anomaly_flag = double(deviation > threshold_dev);
 
 
 %% CRC32‑контроль целостности (эмуляция FPGA1) и Dual-Path логирование
@@ -145,9 +130,6 @@ M = 128;
 N_blocks = floor(N/M);
 crc_ok = true(N_blocks,1); % channel model is ideal in this HIL script
 sequence_id = 1:N_blocks;
-
-% FIX: Предрасчет глобального вектора отклонений один раз перед циклом (для скорости)
-deviation = abs(signal_filtered - signal_smooth);
 
 % Dual‑Path логирование
 % RAM: кольцевой буфер (последние N_ram записей)
@@ -215,13 +197,9 @@ subplot(3,1,2); plot(t, pwm_duty*100, 'b'); ylabel('%'); title('PWM Fan'); grid 
 subplot(3,1,3); plot(t, pin_exp, 'k--'); ylabel('Flag'); title('PIN_EXP (Alarm)'); grid on; xlabel('Time, s');
 sgtitle('Thermal model: 2x FPGA + STM32 + PWM control');
 
-% FIX: Восстанавливаем переменные для графика (расчет занимает доли секунды вне цикла)
-deviation = abs(signal_filtered - signal_smooth);
-threshold_dev = 0.3 * abs(signal_smooth); % Используем abs для корректного порога синусоиды
-
 figure('Color','w');
-subplot(2,1,1); plot(t, signal_raw, 'k', t, signal_filtered, 'b');
-ylabel('Signal'); title('Raw vs Filtered (FPGA2 FIR)'); grid on; legend('Raw','Filtered');
+subplot(2,1,1); plot(t, signal_raw, 'k', t, signal_reference, 'b');
+ylabel('Signal, V'); title('Owon fixed test waveform vs ideal reference'); grid on; legend('Owon input','Ideal reference');
 subplot(2,1,2); plot(t, deviation, 'r', t, threshold_dev, 'g--');
 ylabel('Deviation'); title('Anomaly detection (>30% threshold)'); grid on; legend('Deviation','Threshold');
 xlabel('Time, s');
@@ -244,7 +222,7 @@ last_anomaly_idx = find(anomaly_flag, 1, 'last');
 if ~isempty(last_anomaly_idx)
     % Если аномалии были, берем данные из последней точки
     event_timestamp = round(t(last_anomaly_idx) * 1000); % перевод в мс
-    event_value = signal_filtered(last_anomaly_idx);
+    event_value = signal_raw(last_anomaly_idx);
     event_dev = deviation(last_anomaly_idx) * 100;       % в процентах
 else
     % Если аномалий не было, пишем нули/дефолты
@@ -320,14 +298,14 @@ T_save               = T(:, 1:decim:end);
 pwm_duty_save        = pwm_duty(1:decim:end);
 pin_exp_save         = pin_exp(1:decim:end);
 signal_raw_save      = signal_raw(1:decim:end);
-signal_filtered_save = signal_filtered(1:decim:end);
+signal_reference_save = signal_reference(1:decim:end);
 anomaly_flag_save    = anomaly_flag(1:decim:end);
 
 % ОПТИМИЗАЦИЯ MATLAB: Отключаем сжатие данных (сохраняет мгновенно)
 % Если ваша версия старая и выдает ошибку на '-nocompression', просто удалите этот аргумент.
 save('system_model_data.mat', ...
      't_save', 'T_save', 'pwm_duty_save', 'pin_exp_save', ...
-     'signal_raw_save', 'signal_filtered_save', 'anomaly_flag_save', ...
+    'signal_raw_save', 'signal_reference_save', 'anomaly_flag_save', ...
      'qspi_log', 'ram_buffer', '-v7.3', '-nocompression');
 
 fprintf('Данные мгновенно сохранены в system_model_data.mat (без сжатия, прореживание 1:%d).\n', decim);

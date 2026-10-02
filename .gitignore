@@ -38,6 +38,7 @@ hdlsrc/
 
 # Generated test and measurement output
 input_signals/owon_output/
+/artifacts/ci/
 
 # Cloud based storage dotfile
 .MATLABDriveTag

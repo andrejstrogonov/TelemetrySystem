@@ -1,0 +1,4 @@
+# do hdlverifier_compile_design.do
+# Loading project compile_project
+# ** Error: can't set "PrefMain(file)": couldn't open "C:/Users/strog/OneDrive/Документы/MATLAB/TelemetrySystem/transcript": no such file or directory
+# Executing ONERROR command at macro ./hdlverifier_compile_design.do line 6
