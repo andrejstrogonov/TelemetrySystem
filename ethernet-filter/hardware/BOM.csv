@@ -1,0 +1,21 @@
+Designator,Qty,Manufacturer,Manufacturer Part Number,Description,Package,Net/rail,Status
+J1,1,CUI Devices,PJ-102A,2.1 mm center-positive 12 V DC input jack,TH,12V_IN,Reuse baseline; verify mechanical fit
+F1,1,Littelfuse,1812L110/16DR,Resettable fuse 1.1 A hold 16 V,1812,12V_IN,Reuse baseline; verify derating
+Q1,1,Diodes Incorporated,AO3401A,Reverse-polarity P-channel MOSFET,SOT-23,VIN_PROTECTED,Reuse baseline; verify SOA
+D1,1,Littelfuse,SMCJ15A,15 V standoff TVS diode,DO-214AB,VIN_PROTECTED,Reuse baseline
+U1,1,Texas Instruments,TPS54302DDCR,12 V to 5V5 synchronous buck,SOT-23-6,5V5,Reuse baseline; recheck power budget
+U2,1,Texas Instruments,TPS62160DSGR,5V5 to 1V2 FPGA core buck,WSON-10,1V2_CORE,Reuse baseline; verify current/thermal load
+U3,1,Texas Instruments,TPS62160DSGR,5V5 to 3V3 I/O and PHY buck,WSON-10,3V3_IO,Reuse baseline; verify current/thermal load
+U4,1,Gowin,GW1NR-LV9QN88PC6/I5,GW1NR-9 FPGA packet classifier and RMII bridge,QN88 BGA,1V2_CORE+3V3_IO,Reuse baseline; verify package pinout/resources
+U5,2,Microchip,LAN8742A-CZ-TR candidate,10/100 Ethernet PHY with RMII,24-VQFN,3V3_IO,Verify exact MPN/package and strap network
+U6,1,Generic,TBD 50 MHz CMOS oscillator,50 MHz reference oscillator 3V3 with +/-50 ppm and <=150 ps p-p jitter,4-pad SMD,3V3_IO,Select exact MPN; shared RMII reference
+U7,1,Generic,TBD 1-to-3 clock buffer,50 MHz low-skew fanout for two PHYs and FPGA,SC70/TSSOP,3V3_IO,Select exact MPN after load/timing calculation
+U8,1,STMicroelectronics,STM32G0B1CBT6,PHY MDIO management and link-mode status,LQFP-48,3V3_IO,Reuse baseline; firmware integration required
+R_MDIO,1,Generic,4.7 kOhm 1%,Shared PHY MDIO pull-up,0603,3V3_IO,Confirm pull-up per PHY and bus loading
+J2,1,Generic,TBD 10/100 MagJack with integrated magnetics,Ethernet IN RJ45 1x1 shielded,TH or SMT,ETH0_MDI,Select exact MPN and LED options
+J3,1,Generic,TBD 10/100 MagJack with integrated magnetics,Ethernet OUT RJ45 1x1 shielded,TH or SMT,ETH1_MDI,Select exact MPN and LED options
+J4,1,Generic,SWD 1x6 2.54 mm,STM32 programming header,TH,SWD,Reuse baseline pinout
+J5,1,Generic,JTAG 2x5 2.54 mm,Gowin programming header,TH,JTAG,Reuse baseline pinout; verify voltage and pin mapping
+U9,2,Generic,TBD Ethernet ESD array,Low-capacitance ESD protector for differential pairs,SOT/QFN,ETH0_MDI/ETH1_MDI,Select part and verify channel capacitance
+R1-Rn,As required,Generic,Pull-ups/downs per PHY datasheet,PHY address and RMII mode strap resistors,0603,PHY_STRAPS,Set values from exact LAN8742A datasheet and reset timing
+C1-Cn,As required,Generic,100 nF X7R,Local decoupling per FPGA/regulator/PHY datasheets,0603,3V3_IO/1V2_CORE,Set counts and placements from pinout/layout

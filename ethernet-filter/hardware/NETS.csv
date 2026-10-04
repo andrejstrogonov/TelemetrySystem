@@ -1,0 +1,27 @@
+Net,From,To,Class,Notes
+12V_IN,J1.1,F1.1,Power,12 V DC center positive from the same external adapter
+GND,J1.2,U1/U2/U3/U4/U5/U6,Ground,Continuous low-noise board return; connector shields handled to chassis per EMC layout
+VIN_PROTECTED,F1/Q1/D1,U1.VIN/U2.VIN/U3.VIN,Power,Reuse Rev A input protection chain
+5V5,U1.OUT,U2.VIN/U3.VIN,Power,Reuse baseline intermediate rail; no 5V5 logic signals
+1V2_CORE,U2.OUT,U4.VCC_CORE,Power,Gowin core rail; do not connect directly to LAN8742 VDDCR with internal regulator enabled
+3V3_IO,U3.OUT,U4.VCCIO/U5.VDDIO/VDD1A/VDD2A/U6.VDD/U7.VCC/U8.VDD,Power,"FPGA RMII; PHY digital and analog; MCU; oscillator and clock-buffer rails"
+PG_1V2,U2.PG,U3.EN/U8.power_fault_input,Control,Preserve core-before-I/O sequencing and report faults to STM32
+PG_3V3,U3.PG,U4.rst_n/U5.1.nRST/U5.2.nRST/U8.reset,Control,Hold FPGA/PHY/MCU interfaces in reset until rails stabilize
+OSC_50M,U6.oscillator,U7.clock_buffer,Clock,50 MHz source with PHY reference tolerance and jitter requirements
+RMII_REFCLK_50M,U7.clock_buffer,"U4.ref_clk_50m;U5.1.CLKIN;U5.2.CLKIN",Clock,Shared buffered reference; verify loading and timing
+ETH0_RX,U5.1.RXD[1:0]/CRS_DV/RXER,U4.phy0_rxd/phy0_crs_dv/phy0_rxer,Digital,PHY0 receives from Ethernet IN cable
+ETH0_TX,U4.phy0_txd[1:0]/phy0_txen,U5.1.TXD[1:0]/TXEN,Digital,PHY0 sends toward Ethernet IN cable
+ETH1_RX,U5.2.RXD[1:0]/CRS_DV/RXER,U4.phy1_rxd/phy1_crs_dv/phy1_rxer,Digital,PHY1 receives from Ethernet OUT cable
+ETH1_TX,U4.phy1_txd[1:0]/phy1_txen,U5.2.TXD[1:0]/TXEN,Digital,PHY1 sends toward Ethernet OUT cable
+PHY_RESET,U4.phy0_reset_n/phy1_reset_n,U5.1.nRST/U5.2.nRST,Control,Strap levels must settle before reset release
+PHY_MDC,U8.GPIO,U5.1.MDC/U5.2.MDC,Digital,STM32 configures each PHY by unique address
+PHY_MDIO,U8.GPIO open-drain,U5.1.MDIO/U5.2.MDIO,Digital,Shared management line with pull-up to 3V3
+PHY0_ADDR,U5.1.RXER strap,GND,Strap,PHY management address 0; confirm strap pin sharing at reset
+PHY1_ADDR,U5.2.RXER strap,3V3 via resistor,Strap,PHY management address 1; observe LAN8742 strap timing
+PHY0_LINK_100FD,U8.GPIO,U4.phy0_link_100fd,Control,True only when PHY0 reports a 100 Mbps full-duplex link
+PHY1_LINK_100FD,U8.GPIO,U4.phy1_link_100fd,Control,True only when PHY1 reports a 100 Mbps full-duplex link
+ETH0_MDI,U5.1.TXP/TXN/RXP/RXN,J2 MagJack transformer side,Analog differential,Follow Microchip reference termination/layout; no DC-coupled cable pins
+ETH1_MDI,U5.2.TXP/TXN/RXP/RXN,J3 MagJack transformer side,Analog differential,Follow Microchip reference termination/layout; no DC-coupled cable pins
+FILTER_BLOCKED,U4.blocked_p0_to_p1_pulse;U4.blocked_p1_to_p0_pulse,U8.GPIO or debug header,Digital,Separate one-cycle indicators; use synchronizers before STM32 sampling
+MCU_SWD,U8.SWDIO/SWCLK/NRST,J4.2/J4.4/J4.5,Programming,Include 3V3 and GND pins on the SWD connector
+FPGA_JTAG,U4.TCK/TMS/TDI/TDO,J5.1..10,Programming,Assign exact GW1NR QN88 balls from the Gowin package pinout
