@@ -19,6 +19,7 @@ Ethernet IN ◀ MagJack/PHY 0 ─┘ FPGA └─ PHY 1/MagJack ◀ Ethernet OUT
 - `examples/packet_labels.example.csv` — только пример формата обучающих данных.
 - `hardware/BOM.csv`, `NETS.csv`, `POWER_TREE.md` — начальная логическая аппаратная спецификация.
 - `constraints/ethernet_filter.sdc` — входной такт 50 МГц RMII.
+- [`SECURITY_README.md`](SECURITY_README.md) — статический анализ ограничений безопасности и способов обхода.
 
 ## Модель
 
